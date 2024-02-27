@@ -142,3 +142,6 @@ data/*-public-*
 # temporary Jupyter Notebooks
 notebooks/scratch
 
+# work directory
+work/
+
