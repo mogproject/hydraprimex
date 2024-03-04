@@ -22,7 +22,7 @@ class LBTrivial {
     for (int i = 0; i < n; ++i) {
       for (int j = i + 1; j < n; ++j) {
         //
-        ret = std::min(ret, graph_.weak_red_potential(i, j));
+        ret = std::min(ret, graph_.weak_red_potential(vs[i], vs[j]));
       }
     }
 

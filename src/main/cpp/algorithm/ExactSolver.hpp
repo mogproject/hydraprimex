@@ -65,7 +65,6 @@ class ExactSolver {
       log_debug("ExactSolver: reducible instance: tww=%d", upper_bound_);
       return;  // reducible instance
     }
-    g.compute_pairwise_properties();  // FIXME: This shouldn't be needed.
 
     //--------------------------------------------------------------------------
     //    LBTrivial (tentative implementation)
