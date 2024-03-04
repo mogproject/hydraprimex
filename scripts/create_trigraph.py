@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Simalates the first few steps of contractions and outputs a trigraph.
+Simulates the first few steps of contractions and outputs a trigraph.
 
 Usage:
   create_trigraph.py [-s STEPS] [options] GRAPH_PATH CONTRACTION_PATH
