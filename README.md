@@ -15,7 +15,7 @@ The code is developed based on [Hydra Prime](https://github.com/TheoryInPractice
 
 ### Getting Started
 
-1. Read [Input and Output](https://github.com/mogproject/hydraprimex/wiki/Input-and-Output). You may use scripts in the `scripts` directory to convert file formats.
+1. Read [Input and Output](https://github.com/mogproject/hydraprimex/wiki/Input-and-Output). You may use this [script](https://github.com/mogproject/hydraprimex/blob/main/scripts/create_trigraph.py) to convert file formats.
 1. Install a C++ compiler, GNU Make, and CMake.
 1. Run `make`.
 1. Run executable `build/Release/hydrax`. You may move this file to any path.
