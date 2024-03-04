@@ -34,8 +34,20 @@ class ExactSolver {
   ds::graph::TriGraph::ContractSeq contraction_sequence() const { return seq_; }
 
   void run(util::Random& rand, int lb = 0, int ub = -1) {
+    //--------------------------------------------------------------------------
+    //    Adjust bounds
+    //--------------------------------------------------------------------------
+    int initial_max_red_deg = graph_.max_red_degree();
+    if (lb < initial_max_red_deg) {
+      lb = initial_max_red_deg;
+      log_info("Updated lower bound to initial max red degree: %d", lb);
+    }
+    if (ub < 0) {
+      ub = graph_.number_of_vertices() - 1;
+      log_info("Updated upper bound to n - 1: %d", ub);
+    }
     lower_bound_ = lb;
-    upper_bound_ = ub < 0 ? graph_.number_of_vertices() : ub;
+    upper_bound_ = ub;
 
     ds::graph::TriGraph g = graph_;  // create a copy
 
@@ -45,6 +57,8 @@ class ExactSolver {
     reduction::Reducer reducer;
 
     auto reduced_seq = reducer.reduce(g);
+    if (!reduced_seq.empty()) log_info("Reducer: applied %lu contraction(s)", reduced_seq.size());
+
     util::extend(seq_, reduced_seq);
     if (g.number_of_vertices() <= 1) {
       upper_bound_ = lower_bound_;
@@ -69,7 +83,7 @@ class ExactSolver {
     algorithm::exact::SATSolver sat_solver(g);
 
     util::Timer lap_timer(0, root_timer_);
-    bool solved = sat_solver.run(lb, ub, lap_timer.get_effective_time_limit());
+    bool solved = sat_solver.run(lower_bound_, upper_bound_, lap_timer.get_effective_time_limit());
     if (solved) {
       util::extend(seq_, sat_solver.contraction_sequence());
       lower_bound_ = sat_solver.lower_bound();
