@@ -58,14 +58,13 @@ ds::ProblemInstance read_pace_extended(std::istream &is) {
   ds::graph::TriGraph G(vertices, edges);
 
   // verification
-  int max_red_deg = G.max_red_degree();
-  if (lb > max_red_deg) {
-    throw std::invalid_argument(util::format("lower bound too large: n=%d, lb=%d, max_red_degree=%d", n, lb, max_red_deg));
-  }
   if (n != static_cast<int>(G.number_of_vertices())) throw std::invalid_argument("inconsistent n");
   if (m != static_cast<int>(G.number_of_edges())) throw std::invalid_argument("inconsistent m");
+  if (ub >= 0 && lb > ub) {
+    throw std::invalid_argument(util::format("lower bound larger than upper bound: n=%d, lb=%d, ub=%d", n, lb, ub));
+  }
 
-  ds::ProblemInstance ret = {G, lb, ub < 0 ? n : ub};
+  ds::ProblemInstance ret = {G, lb, ub};
   return ret;
 }
 
