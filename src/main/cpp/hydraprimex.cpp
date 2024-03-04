@@ -45,9 +45,9 @@ int main(int argc, char* argv[]) {
     return 2;
   }
 
-  log_info("Loaded graph (n=%ld, m=%ld, m_red=%ld): %s", instance.graph.number_of_vertices(),
-           instance.graph.number_of_edges(), instance.graph.number_of_red_edges(), conf.input_path.c_str());
-  log_info("Parameters: lb=%d, ub=%d", instance.lower_bound_tww, instance.upper_bound_tww);
+  log_info("Loaded graph (n=%ld, m=%ld, m_red=%ld, lb=%d, ub=%s): %s", instance.graph.number_of_vertices(),
+           instance.graph.number_of_edges(), instance.graph.number_of_red_edges(), instance.lower_bound_tww,
+           instance.upper_bound_tww < 0 ? "INF" : std::to_string(instance.upper_bound_tww).c_str(), conf.input_path.c_str());
 
   // create the solver
   algorithm::ExactSolver solver(instance.graph, &root_timer);
