@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ds/graph/TriGraph.hpp"
+#include "ds/ProblemInstance.hpp"
 
 namespace algorithm {
 namespace base {
@@ -30,6 +30,11 @@ class SolverState {
   std::vector<ds::graph::TriGraph::ContractSeq> contractions_part_;
 
  public:
+  SolverState(ds::ProblemInstance const& instance) : global_lower_bound_(instance.lower_bound_tww) {
+    add_graph(instance.graph, instance.lower_bound_tww, instance.upper_bound_tww);
+    log_debug("%s Initialized SolverState.", label(0).c_str());
+  }
+
   /**
    * @brief Summarize local and global lower bounds and local upper bound.
    *
@@ -38,11 +43,6 @@ class SolverState {
    */
   std::string label(int graph_id) const {
     return util::format("L%d[G%d:L%dU%d]", global_lower_bound_, graph_id, lower_bounds_[graph_id], upper_bounds_[graph_id]);
-  }
-
-  SolverState(ds::graph::TriGraph const& graph, int lower_bound, int upper_bound) : global_lower_bound_(lower_bound) {
-    add_graph(graph, lower_bound, upper_bound);
-    log_debug("%s Initialized SolverState.", label(0).c_str());
   }
 
   GraphID get_unresolved_graph_id() const {

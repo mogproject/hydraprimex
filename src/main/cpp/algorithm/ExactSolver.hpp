@@ -15,7 +15,7 @@ class ExactSolver : public base::BaseSolver {
  public:
   ExactSolver(util::Timer const* root_timer = nullptr) : root_timer_(root_timer) {}
 
-  void run(base::SolverState& state, int graph_id_not_use, util::Random& rand) override {
+  void run(base::SolverState& state, int graph_id, util::Random& rand) override {
     util::Timer timer;
     log_debug("%s ExactSolver started", state.label(0).c_str());
 
@@ -31,7 +31,6 @@ class ExactSolver : public base::BaseSolver {
     //--------------------------------------------------------------------------
     //    Run solvers
     //--------------------------------------------------------------------------
-    int graph_id = -1;
     bool timed_out = false;
     while (!timed_out) {
       if ((graph_id = state.get_unresolved_graph_id()) < 0) {

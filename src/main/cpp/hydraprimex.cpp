@@ -51,7 +51,7 @@ int main(int argc, char* argv[]) {
            instance.upper_bound_tww < 0 ? "INF" : std::to_string(instance.upper_bound_tww).c_str(), conf.input_path.c_str());
 
   // create the solver
-  algorithm::base::SolverState sstate(instance.graph, instance.lower_bound_tww, instance.upper_bound_tww);
+  algorithm::base::SolverState sstate(instance);
   algorithm::ExactSolver solver(&root_timer);
 
   int status_code = 0;

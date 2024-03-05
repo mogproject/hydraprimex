@@ -1,5 +1,6 @@
 #pragma once
 
+#include "algorithm/base/BaseSolver.hpp"
 #include "ds/graph/TriGraph.hpp"
 
 namespace algorithm {
