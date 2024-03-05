@@ -1,68 +1,49 @@
 #pragma once
 #include <cassert>
 
-#include "ds/graph/TriGraph.hpp"
-#include "ds/set/FastSet.hpp"
+#include "algorithm/base/BaseSolver.hpp"
 #include "sat/SATAdapter.hpp"
-#include "util/Random.hpp"
 #include "util/Timer.hpp"
 #include "util/logger.hpp"
 
 namespace algorithm {
 namespace exact {
 
-class SATSolver {
+class SATSolver : public base::BaseSolver {
  private:
-  ds::graph::TriGraph const& graph_;
-  std::vector<ds::graph::TriGraph::Vertex> vertices_;
-  std::unordered_map<ds::graph::TriGraph::Vertex, ds::graph::TriGraph::Vertex> vertices_inv_;
+  util::Timer const* root_timer_;
+  int graph_id_ = 0;
   int n_;
   sat::SATAdapter solver_;
-  int lower_bound_;
-  int upper_bound_;
-  ds::graph::TriGraph::ContractSeq seq_;
 
  public:
-  SATSolver(ds::graph::TriGraph const& graph)
-      : graph_(graph),
-        vertices_(graph.vertices()),
-        vertices_inv_(util::inverse_map(vertices_)),
-        n_(graph.number_of_vertices()),
-        lower_bound_(0),
-        upper_bound_(-1) {}
+  SATSolver(util::Timer const* root_timer = nullptr) : root_timer_(root_timer) {}
 
-  int lower_bound() const { return lower_bound_; }
+  void run(base::SolverState& state, int graph_id, util::Random& rand) override {
+    graph_id_ = graph_id;
+    auto& g = state.get_graph(graph_id);
+    n_ = g.number_of_vertices();
+    auto lb = state.get_lower_bound();  // global lower bound
+    auto ub = state.get_upper_bound(graph_id);
 
-  int upper_bound() const { return upper_bound_; }
+    util::Timer timer(0, root_timer_);
+    auto time_limit_sec = timer.get_effective_time_limit();
 
-  int twin_width() const {
-    assert(lower_bound_ == upper_bound_);
-    return upper_bound_;
-  }
-
-  ds::graph::TriGraph::ContractSeq const& contraction_sequence() { return seq_; }
-
-  bool run(int lower_bound = 0, int upper_bound = -1, int time_limit_sec = 0) {
-    assert(lower_bound <= static_cast<int>(graph_.number_of_vertices()) - 1);
-    assert(static_cast<int>(vertices_.size()) == n_);
-
-    log_info("SATSolver started: n=%ld, m=%ld, lb=%d, ub=%d, time_limit=%s", graph_.number_of_vertices(), graph_.number_of_edges(),
-             lower_bound, upper_bound, time_limit_sec > 0 ? util::format("%ds", time_limit_sec).c_str() : "N/A");
-
-    util::Timer timer;
-    lower_bound_ = lower_bound;
-    upper_bound_ = upper_bound;
+    log_info("%s SATSolver started: n=%ld, m=%ld, lb=%d, ub=%d, time_limit=%s", state.label(graph_id).c_str(),
+             g.number_of_vertices(), g.number_of_edges(), lb, ub,
+             time_limit_sec > 0 ? util::format("%ds", time_limit_sec).c_str() : "N/A");
 
     bool timed_out = false;
-    for (int d = lower_bound_; !timed_out && (upper_bound_ < 0 || d < upper_bound_); ++d) {
-      log_trace("SATSolver checking d=%d", d);
+    for (int d = lb; !timed_out && (ub < 0 || d < ub); ++d) {
+      log_trace("%s SATSolver checking d=%d", state.label(graph_id).c_str(), d);
 
-      auto result = solve(d, time_limit_sec);
+      auto result = solve(state, graph_id, d, time_limit_sec);
       if (result == sat::status::SATISFIABLE) {
         break;
       } else if (result == sat::status::INCONSISTENT || result == sat::status::INCONSISTENT_AND_CORE_COMPUTED) {
-        lower_bound_ = d + 1;
-        log_debug("SATSolver found new LB: lb=%d", lower_bound_);
+        lb = d + 1;
+        state.update_lower_bound(graph_id, lb);
+        log_debug("%s SATSolver found new lower bound: lb=%d", state.label(graph_id).c_str(), lb);
       } else {
         timed_out = true;
         break;
@@ -70,42 +51,51 @@ class SATSolver {
     }
 
     if (timed_out) {
-      log_warning("SATSolver timed out: lb=%d, ub=%d, runtime=%.2fs", lower_bound_, upper_bound_, timer.stop());
+      log_warning("%s SATSolver timed out: lb=%d, ub=%d, runtime=%.2fs", state.label(graph_id).c_str(), lb, ub, timer.stop());
     } else {
-      log_info("SATSolver found exact solution: d=%d, runtime=%.2fs", upper_bound_, timer.stop());
+      log_info("%s SATSolver found exact solution: d=%d, runtime=%.2fs", state.label(graph_id).c_str(), lb, timer.stop());
     }
-    return !timed_out;
   }
 
  private:
-  int solve(int d, int time_limit_sec = 0) {
+  typedef std::vector<ds::graph::TriGraph::Vertex> VertexList;
+  typedef std::unordered_map<ds::graph::TriGraph::Vertex, ds::graph::TriGraph::Vertex> VertexMap;
+
+  int solve(base::SolverState& state, int graph_id, int d, int time_limit_sec = 0) {
+    auto& g = state.get_graph(graph_id);
+
+    // create vertex label maps
+    auto vertices = g.vertices();
+    auto vertices_inv = util::inverse_map(vertices);
+
     // construct clauses
     solver_.restart();
     encode_o();
     encode_p();
-    encode_a();
-    encode_r(d);
+    encode_a(g, vertices_inv);
+    encode_r(g, vertices, vertices_inv, d);
     encode_counter(d);
 
     // solve
     int ret = solver_.solve(time_limit_sec);
     if (ret == sat::status::SATISFIABLE) {
-      upper_bound_ = d;
-
       // decode solution
       auto xs = decode_o();
 
-      seq_.clear();
+      ds::graph::TriGraph::ContractSeq seq;
       for (int i = 0; i < n_ - 1; ++i) {
         int x = xs[i];
         for (int j = x + 1; j < n_; ++j) {
           if (solver_.get_witness(p(x, j))) {
-            // seq_.push_back({graph_.get_label(j), graph_.get_label(x)});  // `x` gets merged into `j`
-            seq_.push_back({vertices_[j], vertices_[x]});  // `x` gets merged into `j`
+            // `x` gets merged into `j`
+            seq.push_back({g.get_label(vertices[j]), g.get_label(vertices[x])});
             break;
           }
         }
       }
+
+      // register solution
+      state.update_upper_bound(graph_id, d, seq);
     }
     return ret;
   }
@@ -156,7 +146,7 @@ class SATSolver {
     }
   }
 
-  void encode_a() {
+  void encode_a(ds::graph::TriGraph const& graph, VertexMap const& vertices_inv) {
     // (3a) semantics of a
     for (int i = 0; i < n_ - 1; ++i) {
       for (int j = i + 1; j < n_; ++j) {
@@ -168,26 +158,26 @@ class SATSolver {
     }
 
     // (4a) initial red edges
-    for (auto& e : graph_.red_edges()) solver_.add_clause({a(vertices_inv_[e.first], vertices_inv_[e.second])});
+    for (auto& e : graph.red_edges()) solver_.add_clause({a(vertices_inv.at(e.first), vertices_inv.at(e.second))});
   }
 
-  void encode_r(int d) {
+  void encode_r(ds::graph::TriGraph const& graph, VertexList const& vertices, VertexMap const& vertices_inv, int d) {
     int const max_diff = 3;
 
     // (3b) semantics of red edges
     for (int i = 0; i < n_ - 1; ++i) {
-      auto ii = vertices_[i];
+      auto ii = vertices[i];
       for (int j = i + 1; j < n_; ++j) {
-        auto jj = vertices_[j];
-        for (auto kk : graph_.get_black_symmetric_difference(ii, jj)) {
-          auto k = vertices_inv_[kk];
+        auto jj = vertices[j];
+        for (auto kk : graph.get_black_symmetric_difference(ii, jj)) {
+          auto k = vertices_inv.at(kk);
           assert(i != k && j != k);
           solver_.add_clause({-p(i, j), -o(i, k), r(i, j, k)});
         }
 
         // extra hints
         for (int diff = 1; diff <= max_diff; ++diff) {
-          if (graph_.weak_red_potential(ii, jj) >= d + diff) {
+          if (graph.weak_red_potential(ii, jj) >= d + diff) {
             // (j,i) cannot be int the first `diff` contraction pair
             std::vector<int> lits;
             for (int k = 0; k < n_; ++k) {
@@ -227,9 +217,9 @@ class SATSolver {
     // for every initial red edge xy
     //   for every i
     //     o(i, x) and o(i, y) -> r(i, x, y)
-    for (auto& e : graph_.red_edges()) {
-      auto x = vertices_inv_[e.first];
-      auto y = vertices_inv_[e.second];
+    for (auto& e : graph.red_edges()) {
+      auto x = vertices_inv.at(e.first);
+      auto y = vertices_inv.at(e.second);
       for (int i = 0; i < n_; ++i) {
         if (i == x || i == y) continue;
         solver_.add_clause({-o(i, x), -o(i, y), r(i, x, y)});

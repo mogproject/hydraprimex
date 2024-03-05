@@ -1,6 +1,7 @@
 #include <memory>
 
 #include "algorithm/ExactSolver.hpp"
+#include "algorithm/base/SolverState.hpp"
 #include "app/AppConfiguration.hpp"
 #include "readwrite/pace_extended.hpp"
 #include "util/Random.hpp"
@@ -33,7 +34,7 @@ int main(int argc, char* argv[]) {
 
   // pseudorandom number generator
   util::Random rand(conf.seed);
-  log_info("Configuration: seed=%u, time-limit=%s", conf.seed,
+  log_info("Solver started: seed=%u, time-limit=%s", conf.seed,
            conf.time_limit > 0 ? util::format("%ds", conf.time_limit).c_str() : "N/A");
 
   // load input file(s)
@@ -41,7 +42,7 @@ int main(int argc, char* argv[]) {
   try {
     instance = readwrite::load_pace_extended(conf.input_path.c_str());
   } catch (std::invalid_argument const& e) {
-    log_critical("File format error: %s", e.what());
+    log_error("File format error: %s", e.what());
     return 2;
   }
 
@@ -50,44 +51,62 @@ int main(int argc, char* argv[]) {
            instance.upper_bound_tww < 0 ? "INF" : std::to_string(instance.upper_bound_tww).c_str(), conf.input_path.c_str());
 
   // create the solver
-  algorithm::ExactSolver solver(instance.graph, &root_timer);
+  algorithm::base::SolverState sstate(instance.graph, instance.lower_bound_tww, instance.upper_bound_tww);
+  algorithm::ExactSolver solver(&root_timer);
 
   int status_code = 0;
   try {
-    solver.run(rand, instance.lower_bound_tww, instance.upper_bound_tww);
-    if (solver.resolved()) {
-      // verification
-      // log_debug("constr_seq: %s", cstr(solver.contraction_sequence()));
-      int tww = ds::graph::TriGraph::verify_contraction_sequence(instance.graph, solver.contraction_sequence());
+    solver.run(sstate, -1, rand);
 
-      if (tww == solver.twin_width()) {
-        // ok
-        log_success("Found a solution: tww=%d, elapsed=%.3fs", solver.twin_width(), root_timer.stop());
+    if (sstate.resolved()) {
+      auto cs = sstate.contraction_sequence();
+      int tww = sstate.get_upper_bound();
 
-        // output results
-        if (conf.tww_mode) {
-          // twin-width
-          printf("%d\n", solver.twin_width());
+      if (cs.size() + 1 != instance.graph.number_of_vertices()) {
+        if (tww == instance.upper_bound_tww) {
+          log_success("Given upper bound is optimal (no output): tww=%d, elapsed=%.3fs", tww, root_timer.stop());
         } else {
-          // contraction sequence
-          for (auto p : solver.contraction_sequence()) {
-            printf("%d %d\n", instance.graph.get_label(p.first), instance.graph.get_label(p.second));
-          }
+          // something is wrong
+          log_critical("Possible bug: elapsed=%.3fs, cs=%s", root_timer.stop(), cstr(cs));
+          status_code = 3;
         }
       } else {
-        log_critical("Twin-width does not match: claimed=%d, actual=%d", solver.twin_width(), tww);
-        status_code = 2;
+        // verification
+        int actual_tww = ds::graph::TriGraph::verify_contraction_sequence(instance.graph, cs);
+
+        if (tww == actual_tww) {
+          // ok
+          if (tww < instance.lower_bound_tww) {
+            // given lower bound might be wrong
+            log_warning("Contraction width is below the given lower bound: tww=%d, lb=%d", tww, instance.lower_bound_tww);
+          }
+
+          log_success("Found a solution: tww=%d, elapsed=%.3fs", tww, root_timer.stop());
+
+          // output results
+          if (conf.tww_mode) {
+            // twin-width
+            printf("%d\n", tww);
+          } else {
+            // contraction sequence
+            for (auto p : cs) { printf("%d %d\n", p.first, p.second); }
+          }
+        } else {
+          log_critical("Twin-width does not match: claimed=%d, actual=%d", tww, actual_tww);
+          status_code = 2;
+        }
       }
     } else {
-      log_critical("Failed to find a solution: elapsed=%.3fs", root_timer.stop());
+      // not resolved
+      log_error("Could not find a solution: elapsed=%.3fs", root_timer.stop());
       status_code = 2;
     }
   } catch (std::invalid_argument const& e) {
     log_critical("Solver error: invalid_argument: %s", e.what());
-    status_code = 2;
+    status_code = 3;
   } catch (std::exception const& e) {  //
     log_critical("Solver error: %s", e.what());
-    status_code = 2;
+    status_code = 3;
   }
 
   return status_code;
