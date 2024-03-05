@@ -7,13 +7,16 @@ using namespace std;
 
 void verify_instance(std::string const& path, int tww, util::Random& rand) {
   auto inst = readwrite::load_pace_extended(path.c_str());
-  algorithm::ExactSolver solver(inst.graph);
-  solver.run(rand, inst.lower_bound_tww, inst.upper_bound_tww);
+  algorithm::base::SolverState state(inst);
+  algorithm::ExactSolver solver;
+  solver.run(state, -1, rand);
 
-  EXPECT_TRUE(solver.resolved());
-  EXPECT_LE(solver.twin_width(), tww);
-  auto red_deg = ds::graph::TriGraph::verify_contraction_sequence(inst.graph, solver.contraction_sequence());
-  EXPECT_EQ(solver.twin_width(), red_deg);
+  EXPECT_TRUE(state.resolved());
+  int claimed_tww = state.get_upper_bound();
+  EXPECT_EQ(claimed_tww, state.get_lower_bound());
+  auto actual_tww = ds::graph::TriGraph::verify_contraction_sequence(inst.graph, state.contraction_sequence());
+  EXPECT_EQ(claimed_tww, actual_tww);
+  EXPECT_LE(claimed_tww, tww);  // compare with given tww
 }
 
 TEST(ExactSolverTest, RunWithSmallInstances) {

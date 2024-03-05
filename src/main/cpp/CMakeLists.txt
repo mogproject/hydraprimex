@@ -18,7 +18,9 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -DNDEBUG -DUNSAT -DNPROOFS -DQUIET")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -fopenmp -lpthread")
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -fno-omit-frame-pointer -fsanitize=leak -O0")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -fno-omit-frame-pointer -fsanitize=leak -O0 -gdwarf-4")
+  # Note: `-gdwarf-4` is a hack for enabling pretty printing with LLDB on MacOS.
+  #       ref: https://stackoverflow.com/questions/66225829/why-lldb-pretty-printers-doesnt-work-for-gnu-gcc-compiled-program-on-macos
 else()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -funroll-loops -O3")
 endif ()

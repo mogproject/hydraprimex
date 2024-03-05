@@ -6,19 +6,22 @@
 using namespace std;
 
 void verify_instance(char const* pattern, int index, int n, int tww) {
+  util::Random rand(12345);
   for (int s = 0; s < n; ++s) {
     auto path = util::format(pattern, index, index, s);
     auto inst = readwrite::load_pace_extended(path.c_str());
 
     log_info("---------- %s", path.c_str());
-    algorithm::exact::SATSolver solver(inst.graph);
-    solver.run(inst.lower_bound_tww, inst.upper_bound_tww);
+    algorithm::base::SolverState state(inst);
+    algorithm::exact::SATSolver solver;
+    solver.run(state, 0, rand);
 
-    log_debug("tww=%d, seq=%s", solver.twin_width(), cstr(solver.contraction_sequence()));
-
-    EXPECT_LE(solver.twin_width(), tww);
-    auto red_deg = ds::graph::TriGraph::verify_contraction_sequence(inst.graph, solver.contraction_sequence());
-    EXPECT_EQ(solver.twin_width(), red_deg);
+    EXPECT_TRUE(state.resolved());
+    int claimed_tww = state.get_upper_bound();
+    EXPECT_EQ(claimed_tww, state.get_lower_bound());
+    auto actual_tww = ds::graph::TriGraph::verify_contraction_sequence(inst.graph, state.contraction_sequence());
+    EXPECT_EQ(claimed_tww, actual_tww);
+    EXPECT_LE(claimed_tww, tww);
   }
 }
 
@@ -49,15 +52,21 @@ TEST(SATSolverTest, RunWithSmallInstances) {
 }
 
 TEST(SATSolverTest, RunWithMissingVertices) {
+  util::Random rand(12345);
+
   auto inst = readwrite::load_pace_extended("src/test/resources/small/002/small002-s8.gr");
   inst.graph.contract(5, 1);
-  algorithm::exact::SATSolver solver(inst.graph);
+  algorithm::exact::SATSolver solver;
 
   util::set_log_level(util::logging::LogLevel::NONE);
-  solver.run(inst.lower_bound_tww, inst.upper_bound_tww);
+  algorithm::base::SolverState state({inst.graph, inst.lower_bound_tww, inst.upper_bound_tww});
+  solver.run(state, 0, rand);
   util::set_log_level(util::logging::LogLevel::TRACE);
 
-  auto red_deg = ds::graph::TriGraph::verify_contraction_sequence(inst.graph, solver.contraction_sequence());
-  EXPECT_EQ(solver.twin_width(), red_deg);
-  EXPECT_EQ(solver.twin_width(), 2);
+  EXPECT_TRUE(state.resolved());
+  int claimed_tww = state.get_upper_bound();
+  EXPECT_EQ(claimed_tww, state.get_lower_bound());
+  auto actual_tww = ds::graph::TriGraph::verify_contraction_sequence(inst.graph, state.contraction_sequence());
+  EXPECT_EQ(claimed_tww, actual_tww);
+  EXPECT_EQ(claimed_tww, 2);
 }

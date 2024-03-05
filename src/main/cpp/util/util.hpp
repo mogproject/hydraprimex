@@ -94,7 +94,7 @@ std::vector<T> range_to_vec(T n) {
 template <typename T>
 std::unordered_map<T, int> inverse_map(std::vector<T> const& xs) {
   std::unordered_map<T, int> ret;
-  for (std::size_t i = 0; i < xs.size(); ++i) ret[xs[i]] = i;
+  for (int i = 0; i < static_cast<int>(xs.size()); ++i) ret[xs[i]] = i;
   return ret;
 }
 
