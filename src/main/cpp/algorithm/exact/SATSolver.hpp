@@ -12,15 +12,13 @@ namespace exact {
 class SATSolver : public base::BaseSolver {
  private:
   util::Timer const* root_timer_;
-  int graph_id_ = 0;
-  int n_;
+  int n_ = 0;
   sat::SATAdapter solver_;
 
  public:
   SATSolver(util::Timer const* root_timer = nullptr) : root_timer_(root_timer) {}
 
   void run(base::SolverState& state, int graph_id, util::Random& rand) override {
-    graph_id_ = graph_id;
     auto& g = state.get_graph(graph_id);
     n_ = g.number_of_vertices();
     auto lb = state.get_lower_bound();  // global lower bound

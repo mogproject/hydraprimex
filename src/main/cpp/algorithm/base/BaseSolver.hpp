@@ -9,6 +9,7 @@ namespace base {
 class BaseSolver {
  public:
   virtual void run(SolverState &state, int graph_id, util::Random &rand) = 0;
+  virtual ~BaseSolver() = default;
 };
 }  // namespace base
 }  // namespace algorithm
