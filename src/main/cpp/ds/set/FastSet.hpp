@@ -4,6 +4,7 @@
 #include <vector>
 
 namespace ds {
+namespace set {
 /**
  * @brief Fixed-size, constant-time reusable integer set representation.
  */
@@ -70,4 +71,5 @@ class FastSet {
   int generation_;
   std::vector<int> data_;
 };
+}  // namespace set
 }  // namespace ds

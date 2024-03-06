@@ -3,6 +3,7 @@
 #include <algorithm>
 
 namespace ds {
+namespace set {
 
 /**
  * @brief Fixed-size, constant-time integer set representation.
@@ -83,4 +84,5 @@ std::vector<int> FastSet::to_vector() const {
   return ret;
 }
 
+}  // namespace set
 }  // namespace ds

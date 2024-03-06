@@ -5,6 +5,7 @@
 #include "algorithm/exact/SATSolver.hpp"
 #include "algorithm/lowerbound/LBTrivial.hpp"
 #include "algorithm/reduction/Reducer.hpp"
+#include "algorithm/upperbound/GreedySolver.hpp"
 #include "util/Timer.hpp"
 
 namespace algorithm {
@@ -26,6 +27,9 @@ class ExactSolver : public base::BaseSolver {
 
     solvers.push_back(std::make_unique<reduction::Reducer>());
     solvers.push_back(std::make_unique<lowerbound::LBTrivial>());  // tentative implementation
+    solvers.push_back(std::make_unique<upperbound::GreedySolver>(1000, 2, root_timer_, 500, 0));       // quick greedy
+    solvers.push_back(std::make_unique<exact::SATSolver>(root_timer_, 10));                            // quick SAT
+    solvers.push_back(std::make_unique<upperbound::GreedySolver>(100000, 30, root_timer_, 10000, 0));  // greedy
     solvers.push_back(std::make_unique<exact::SATSolver>(root_timer_));
 
     //--------------------------------------------------------------------------
