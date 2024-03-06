@@ -11,21 +11,25 @@ namespace exact {
 
 class SATSolver : public base::BaseSolver {
  private:
+  int time_limit_sec_;
   util::Timer const* root_timer_;
   int n_ = 0;
   sat::SATAdapter solver_;
 
  public:
-  SATSolver(util::Timer const* root_timer = nullptr) : root_timer_(root_timer) {}
+  SATSolver(util::Timer const* root_timer = nullptr, int time_limit_sec = 0)
+      : time_limit_sec_(time_limit_sec), root_timer_(root_timer) {}
 
   void run(base::SolverState& state, int graph_id, util::Random& rand) override {
+    if (state.resolved(graph_id)) return;  // already resolved
+
+    util::Timer timer(time_limit_sec_, root_timer_);
+    auto time_limit_sec = timer.get_effective_time_limit();
+
     auto& g = state.get_graph(graph_id);
     n_ = g.number_of_vertices();
     auto lb = state.get_lower_bound();  // global lower bound
     auto ub = state.get_upper_bound(graph_id);
-
-    util::Timer timer(0, root_timer_);
-    auto time_limit_sec = timer.get_effective_time_limit();
 
     log_info("%s SATSolver started: n=%ld, m=%ld, lb=%d, ub=%d, time_limit=%s", state.label(graph_id).c_str(),
              g.number_of_vertices(), g.number_of_edges(), lb, ub,

@@ -152,6 +152,13 @@ class TriGraph {
   std::size_t number_of_vertices() const { return vertices_.size(); }
 
   /**
+   * @brief Returns the number of original vertices of the graph.
+   *
+   * @return std::size_t number of original vertices
+   */
+  std::size_t number_of_original_vertices() const { return n_orig_; }
+
+  /**
    * @brief Returns the number of edges in the graph.
    *
    * @return std::size_t number of edges
@@ -411,6 +418,12 @@ class TriGraph {
     return ret;
   }
 
+  int outer_red_potential(Vertex i, Vertex j) const {
+    int ret = -1;
+    for (auto v : adj_black_[i] ^ adj_black_[j]) ret = std::max(ret, red_degree(v));
+    return ret >= 0 ? ret + 1 : 0;
+  }
+
   void compute_pairwise_properties() {
     for (int i = 0; i < n_orig_; ++i) {
       for (int j = i + 1; j < n_orig_; ++j) {
@@ -432,10 +445,13 @@ class TriGraph {
    * @param i vertex to be merged
    * @return int maximum red degree in the closed neighborhood of j after contraction
    */
-  int contract(Vertex j, Vertex i) {
+  int contract(Vertex j, Vertex i, EdgeList* updated_vertex_pairs = nullptr) {
     assert(has_vertex(i));
     assert(has_vertex(j));
     assert(i != j);
+
+    // initialize update list
+    EdgeList updated;
 
     // categorize the neighborhood of i and j
     bool edge_ij = has_edge(i, j);
@@ -467,16 +483,19 @@ class TriGraph {
       for (auto b : b1 | b2) {
         ++ncn_[a][b];  // j becomes a new common neighbor of a and b
         ++ncn_[b][a];
+        updated.push_back({std::min(a, b), std::max(a, b)});
       }
       for (auto v : adj_black_[a] | adj_red_[a]) {
         if (v != i) {
           ++ncn_[j][v];  // a becomes a new common neighbor of j and v
           ++ncn_[v][j];
+          updated.push_back({std::min(j, v), std::max(j, v)});
         }
       }
       if (edge_ij) {
         --ncn_[j][a];  // i was a common neighbor
         --ncn_[a][j];
+        updated.push_back({std::min(j, a), std::max(j, a)});
       }
     }
 
@@ -484,6 +503,7 @@ class TriGraph {
       for (auto y : common_nbrs) {
         if (x == y) continue;
         --ncn_[x][y];  // i was a common neighbor of x and y
+        updated.push_back({std::min(x, y), std::max(x, y)});
       }
     }
 
@@ -491,6 +511,7 @@ class TriGraph {
       for (auto x : common_nbrs) {
         --ncn_[j][x];  // i was a common neighbor of j and x
         --ncn_[x][j];
+        updated.push_back({std::min(j, x), std::max(j, x)});
       }
     }
 
@@ -502,10 +523,12 @@ class TriGraph {
       for (auto y : adj_red_[i]) {
         if (x == y) continue;
         --ncr_[x][y];
+        updated.push_back({std::min(x, y), std::max(x, y)});
       }
       for (auto y : adj_black_[i]) {
         --ncr_[x][y];
         --ncr_[y][x];
+        updated.push_back({std::min(x, y), std::max(x, y)});
       }
     }
 
@@ -515,6 +538,7 @@ class TriGraph {
       for (auto y : new_nbrs) {
         if (x == y) continue;
         ++ncr_[x][y];
+        updated.push_back({std::min(x, y), std::max(x, y)});
       }
     }
 
@@ -522,6 +546,7 @@ class TriGraph {
       for (auto y : c1 | c2 | c4 | b2) {
         ++ncr_[x][y];
         ++ncr_[y][x];
+        updated.push_back({std::min(x, y), std::max(x, y)});
       }
     }
 
@@ -529,6 +554,7 @@ class TriGraph {
       for (auto y : c1) {
         ++ncr_[x][y];
         ++ncr_[y][x];
+        updated.push_back({std::min(x, y), std::max(x, y)});
       }
     }
 
@@ -538,6 +564,7 @@ class TriGraph {
         if (y == i) continue;
         ++ncr_[y][j];
         ++ncr_[j][y];
+        updated.push_back({std::min(y, j), std::max(y, j)});
       }
     }
     for (auto x : c3 | b1) {
@@ -545,6 +572,7 @@ class TriGraph {
         if (y == j) continue;
         ++ncr_[y][j];
         ++ncr_[j][y];
+        updated.push_back({std::min(y, j), std::max(y, j)});
       }
     }
 
@@ -578,6 +606,14 @@ class TriGraph {
     //--------------------------------------------------------------------------
     // (4) Return max red degree in the neighborhood
     //--------------------------------------------------------------------------
+    if (updated_vertex_pairs) {
+      // create a unique list of updated vertex pairs
+      std::sort(updated.begin(), updated.end());
+      auto it = std::unique(updated.begin(), updated.end());
+      updated.resize(std::distance(updated.begin(), it));
+      *updated_vertex_pairs = updated;
+    }
+
     int ret = red_degree(j);
     for (auto w : adj_black_[j] | adj_red_[j]) ret = std::max(ret, red_degree(w));
     return ret;
