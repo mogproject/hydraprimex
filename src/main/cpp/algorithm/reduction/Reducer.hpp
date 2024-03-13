@@ -7,9 +7,7 @@ namespace algorithm {
 namespace reduction {
 class Reducer : public base::BaseSolver {
  public:
-  void run(base::SolverState &state, int graph_id, util::Random &rand) override {
-    auto &g = state.get_graph(graph_id);
-
+  static ds::graph::TriGraph::ContractSeq reduce(ds::graph::TriGraph &g, std::string const &log_prefix = "") {
     ds::graph::TriGraph::ContractSeq seq;
     bool updated = true;
     while (updated) {
@@ -24,7 +22,7 @@ class Reducer : public base::BaseSolver {
 
       if (n >= 5 && 4 * mb > n * (n - 1) - 2 * mr) {
         g.black_complement();
-        log_debug("%s Reducer: took the complement: n=%lu, m=%lu, m_red=%lu", state.label(graph_id).c_str(),
+        log_trace("%s Reducer: took the complement: n=%lu, m=%lu, m_red=%lu", log_prefix.c_str(),
                   g.number_of_vertices(), g.number_of_edges(), g.number_of_red_edges());
       }
 
@@ -44,13 +42,18 @@ class Reducer : public base::BaseSolver {
             auto vv = g.get_label(v);
             auto uu = g.get_label(u);
             seq.push_back({vv, uu});
-            log_debug("%s Reducer: free contraction: (%d <- %d)", state.label(graph_id).c_str(), vv, uu);
+            log_trace("%s Reducer: free contraction: (%d <- %d)", log_prefix.c_str(), vv, uu);
             break;
           }
         }
         if (updated) break;
       }
     }
+    return seq;
+  }
+
+  void run(base::SolverState &state, int graph_id, util::Random &rand) override {
+    auto seq = Reducer::reduce(state.get_graph(graph_id), state.label(graph_id));
 
     auto lb = state.get_lower_bound(graph_id);
     state.add_partial_solution(graph_id, lb, seq);
