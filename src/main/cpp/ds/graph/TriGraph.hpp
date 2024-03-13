@@ -359,6 +359,9 @@ class TriGraph {
     return ret;
   }
 
+  AdjSet const& red_neighbors(Vertex i) const { return adj_red_[i]; }
+  AdjSet const& black_neighbors(Vertex i) const { return adj_black_[i]; }
+
   int degree(Vertex i) const {
     assert(0 <= i && i < n_orig_);  // vertex out of range
 

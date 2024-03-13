@@ -8,7 +8,7 @@ using namespace ds::graph;
 
 typedef TriGraph::ContractSeq Seq;
 
-void verify_instance_greedy(std::string const& path, int tww) {
+static void verify_instance_greedy(std::string const& path, int tww) {
   util::Random rand(12345);
 
   auto inst = readwrite::load_pace_extended(path.c_str());
@@ -23,7 +23,7 @@ void verify_instance_greedy(std::string const& path, int tww) {
   EXPECT_GE(claimed_tww, tww);
 }
 
-std::string p(int index, int steps) {
+static std::string p(int index, int steps) {
   return util::format("src/test/resources/tiny-set/%03d/tiny%03d-s%d.gr", index, index, steps);
 }
 
