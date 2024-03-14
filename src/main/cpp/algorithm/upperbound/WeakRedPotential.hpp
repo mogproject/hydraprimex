@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ds/graph/GraphLog.hpp"
 #include "ds/graph/TriGraph.hpp"
 #include "ds/queue/AdaptivePriorityQueue.hpp"
 #include "ds/set/FastSet.hpp"
@@ -57,11 +58,11 @@ class WeakRedPotential {
   }
 
   int contract(Vertex j, Vertex i) {
-    EdgeList updated;
-    int ret = graph_.contract(j, i, &updated);
+    ds::graph::GraphLog graph_log;
+    int ret = graph_.contract(j, i, &graph_log);
 
     // enqueue vertex pairs
-    for (auto &p : updated) update_element(p.first, p.second);
+    for (auto &p : graph_log.mu_delta) update_element(p.first.first, p.first.second);
     return ret;
   }
 

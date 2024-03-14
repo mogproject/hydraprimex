@@ -115,3 +115,37 @@ TEST(TriGraphTest, Contract) {
     }
   }
 }
+
+TEST(TriGraphTest, UndoContraction) {
+  util::Random rand(1234567);
+
+  for (auto pr : vector<double>({0.2, 0.5})) {
+    for (auto n : vector<int>({5, 10, 30})) {
+      for (int t = 0; t < 20; ++t) {
+        // create a random graph
+        auto g = generator::erdos_renyi_graph(n, pr, rand);
+
+        // create a random contraction sequence
+        auto seq = random_contraction_sequence(n, rand);
+
+        vector<TriGraph> graphs = {g};
+        vector<GraphLog> history;
+
+        for (auto &p : seq) {
+          GraphLog graph_log;
+          graphs.push_back(graphs.back());
+          graphs.back().contract(p.first, p.second, &graph_log);
+          graphs.back().check_consistency();
+          history.push_back(graph_log);
+        }
+
+        // undo
+        for (int i = n - 2; i >= 0; --i) {
+          graphs[i + 1].undo(history[i]);
+          graphs[i + 1].check_consistency();
+          EXPECT_EQ(graphs[i], graphs[i + 1]);
+        }
+      }
+    }
+  }
+}

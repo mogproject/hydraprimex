@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ds/graph/GraphLog.hpp"
 #include "ds/set/SortedVectorSet.hpp"
 #include "util/hash_table.hpp"
 #include "util/logger.hpp"
@@ -328,6 +329,16 @@ class TriGraph {
     hash_ ^= red_edge_hash(i, j);
   }
 
+  void remove_edge(Vertex i, Vertex j) {
+    assert(has_edge(i, j));
+
+    if (has_black_edge(i, j)) {
+      remove_black_edge(i, j);
+    } else {
+      remove_red_edge(i, j);
+    }
+  }
+
   void remove_black_edge(Vertex i, Vertex j) {
     assert(has_black_edge(i, j));
 
@@ -444,7 +455,7 @@ class TriGraph {
    * @param i vertex to be merged
    * @return int maximum red degree in the closed neighborhood of j after contraction
    */
-  int contract(Vertex j, Vertex i, EdgeList* updated_vertex_pairs = nullptr) {
+  int contract(Vertex j, Vertex i, GraphLog* graph_log = nullptr) {
     assert(has_vertex(i));
     assert(has_vertex(j));
     assert(i != j);
@@ -536,15 +547,22 @@ class TriGraph {
 
     for (auto& p : mu_delta_j) mu_delta.push_back({{j, p.first}, p.second});
 
-    for (auto& p : mu_delta) {
-      auto u = p.first.first;
-      auto v = p.first.second;
-      mu_[u][v] += p.second;
-      mu_[v][u] += p.second;
+    //--------------------------------------------------------------------------
+    // II. Save information for rollback
+    //--------------------------------------------------------------------------
+    if (graph_log) {
+      graph_log->log_type = GraphLogType::CONTRACTION;
+      graph_log->merge = j;
+      graph_log->merged = i;
+      graph_log->removed_black = adj_black_[i].to_vector();
+      graph_log->removed_red = adj_red_[i].to_vector();
+      graph_log->new_neighbors = (a1 | a2).to_vector();
+      graph_log->recolored = (b1 | c3).to_vector();
+      graph_log->mu_delta = mu_delta;
     }
 
     //--------------------------------------------------------------------------
-    // II. Make changes
+    // III. Make changes
     //--------------------------------------------------------------------------
     // remove edge ij if exists
     if (edge_ij) {
@@ -562,31 +580,66 @@ class TriGraph {
     }
 
     // add red edges {j, w| w <- N(i) - N(j)}
-    for (int w : a1 | a2) {
-      //
-      add_red_edge(j, w);
-    }
+    for (int w : a1 | a2) add_red_edge(j, w);
 
     // remove vertex i
     remove_vertex(i);
 
-    //--------------------------------------------------------------------------
-    // (4) Return max red degree in the neighborhood
-    //--------------------------------------------------------------------------
-    if (updated_vertex_pairs) {
-      // create a unique list of updated vertex pairs
-      std::sort(updated.begin(), updated.end());
-      auto it = std::unique(updated.begin(), updated.end());
-      updated.resize(std::distance(updated.begin(), it));
-      *updated_vertex_pairs = updated;
+    // update mu values
+    for (auto& p : mu_delta) {
+      auto u = p.first.first;
+      auto v = p.first.second;
+      mu_[u][v] += p.second;
+      mu_[v][u] += p.second;
     }
 
+    //--------------------------------------------------------------------------
+    // IV. Return max red degree in the neighborhood
+    //--------------------------------------------------------------------------
     int ret = red_degree(j);
     for (auto w : adj_black_[j] | adj_red_[j]) ret = std::max(ret, red_degree(w));
     return ret;
   }
 
-  void undo_contract() {}
+  void undo(GraphLog const& graph_log) {
+    switch (graph_log.log_type) {
+      case GraphLogType::COMPLEMENT: {
+        black_complement();
+        break;
+      }
+      case GraphLogType::CONTRACTION: {
+        int i = graph_log.merged;
+        int j = graph_log.merge;
+
+        add_vertex(i);
+
+        // add edges
+        for (auto w : graph_log.removed_black) add_black_edge(i, w);
+        for (auto w : graph_log.removed_red) add_red_edge(i, w);
+
+        // remove edges
+        for (auto w : graph_log.new_neighbors) remove_edge(j, w);
+
+        // recolor edges
+        for (auto w : graph_log.recolored) {
+          remove_red_edge(j, w);
+          add_black_edge(j, w);
+        }
+
+        // revert mu values
+        for (auto& p : graph_log.mu_delta) {
+          auto u = p.first.first;
+          auto v = p.first.second;
+          mu_[u][v] -= p.second;
+          mu_[v][u] -= p.second;
+        }
+        break;
+      }
+      default: {
+        throw std::invalid_argument("never happens");
+      }
+    }
+  }
 
   //============================================================================
   //    Contraction sequence verification
