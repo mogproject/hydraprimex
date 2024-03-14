@@ -679,6 +679,81 @@ class TriGraph {
     }
   }
 
+  /**
+   * @brief Finds all vertex pairs whose weak red potential is at most the given threshold.
+   *
+   * @param upper_bound threshold value
+   * @param frozen_vertices vertices excluded from candidates
+   * @return std::vector<std::pair<Vertex, Vertex>> contraction candidates
+   */
+  std::vector<std::pair<Vertex, Vertex>> find_candidates(int upper_bound, VertexList const& frozen_vertices = {}) const {
+    static ds::set::FastSet frozen(n_orig_);
+    for (auto x : frozen_vertices) frozen.set(x);
+
+    VertexList vs;
+    for (auto x : vertices_) {
+      if (!frozen.get(x)) vs.push_back(x);
+    }
+
+    std::vector<std::pair<Vertex, Vertex>> ret;
+
+    int n = vs.size();
+    for (int i = 0; i < n; ++i) {
+      auto u = vs[i];
+      for (int j = i + 1; j < n; ++j) {
+        auto v = vs[j];
+        if (weak_red_potential(u, v) <= upper_bound) ret.push_back({u, v});
+      }
+    }
+    return ret;
+  }
+
+  /**
+   * @brief Updates contraction candidates after a contraction.
+   *
+   * @param previous_candidates previous candidates
+   * @param graph_log GraphLog instance of the previous contraction
+   * @param upper_bound threshould value
+   * @param frozen_vertices vertices excluded from candidates
+   * @return std::vector<std::pair<Vertex, Vertex>> contraction candidates
+   */
+  std::vector<std::pair<Vertex, Vertex>> update_candidates(               //
+      std::vector<std::pair<Vertex, Vertex>> const& previous_candidates,  //
+      GraphLog const& graph_log,                                          //
+      int upper_bound,                                                    //
+      VertexList const& frozen_vertices = {}                              //
+  ) const {
+    static ds::set::FastSet frozen;
+    static ds::set::FastSet seen;
+
+    frozen.resize(n_orig_);
+    seen.resize(n_orig_ * n_orig_);
+
+    for (auto x : frozen_vertices) frozen.set(x);
+
+    std::vector<std::pair<Vertex, Vertex>> ret;
+    for (auto& p : graph_log.potential_decreased) {
+      auto u = p.first;
+      auto v = p.second;
+      if (frozen.get(u) || frozen.get(v)) continue;
+      if (weak_red_potential(u, v) > upper_bound) continue;
+      ret.push_back({u, v});
+      seen.set(key(n_orig_, u, v));
+    }
+
+    for (auto& p : previous_candidates) {
+      auto u = p.first;
+      auto v = p.second;
+      assert(!frozen.get(u) && !frozen.get(v));
+      if (u == graph_log.merged || v == graph_log.merged) continue;
+      if (seen.get(key(n_orig_, u, v))) continue;
+      if (weak_red_potential(u, v) > upper_bound) continue;
+      ret.push_back({u, v});
+    }
+
+    return ret;
+  }
+
   //============================================================================
   //    Contraction sequence verification
   //============================================================================

@@ -152,8 +152,6 @@ TEST(TriGraphTest, UndoContraction) {
 }
 
 TEST(TriGraphTest, ContractPotentialDecreased) {
-  util::Random rand(12345);
-
   TriGraph g(util::range_to_vec(7), {
                                         {{0, 1}, 0},
                                         {{0, 2}, 0},
@@ -173,4 +171,58 @@ TEST(TriGraphTest, ContractPotentialDecreased) {
   g.contract(0, 2, &graph_log);
   sort(graph_log.potential_decreased.begin(), graph_log.potential_decreased.end());
   EXPECT_EQ(graph_log.potential_decreased, VII({{0, 5}, {0, 6}, {3, 6}, {4, 6}}));
+}
+
+TEST(TriGraphTest, UpdateCandidates) {
+  TriGraph g(util::range_to_vec(7), {
+                                        {{0, 1}, 0},
+                                        {{0, 2}, 0},
+                                        {{0, 3}, 0},
+                                        {{1, 3}, 0},
+                                        {{1, 4}, 0},
+                                        {{2, 6}, 1},
+                                        {{3, 5}, 1},
+                                        {{5, 6}, 0},
+                                    });
+  GraphLog graph_log;
+
+  auto cand = g.find_candidates(2);
+  EXPECT_EQ(cand, VII({{0, 1}, {0, 3}, {0, 4}, {1, 3}, {1, 4}, {2, 6}, {3, 4}, {5, 6}}));
+
+  g.contract(0, 1, &graph_log);
+  cand = g.update_candidates(cand, graph_log, 2);
+  sort(cand.begin(), cand.end());
+  EXPECT_EQ(cand, VII({{0, 4}, {2, 4}, {2, 6}, {3, 4}, {3, 5}, {5, 6}}));
+
+  g.contract(0, 2, &graph_log);
+  cand = g.update_candidates(cand, graph_log, 2);
+  sort(cand.begin(), cand.end());
+  EXPECT_EQ(cand, VII({{0, 4}, {3, 4}, {3, 5}, {3, 6}, {4, 6}, {5, 6}}));
+}
+
+TEST(TriGraphTest, UpdateCandidatesWithFrozen) {
+  TriGraph g(util::range_to_vec(7), {
+                                        {{0, 1}, 0},
+                                        {{0, 2}, 0},
+                                        {{0, 3}, 0},
+                                        {{1, 3}, 0},
+                                        {{1, 4}, 0},
+                                        {{2, 6}, 1},
+                                        {{3, 5}, 1},
+                                        {{5, 6}, 0},
+                                    });
+  GraphLog graph_log;
+
+  auto cand = g.find_candidates(2, {5});
+  EXPECT_EQ(cand, VII({{0, 1}, {0, 3}, {0, 4}, {1, 3}, {1, 4}, {2, 6}, {3, 4}}));
+
+  g.contract(0, 1, &graph_log);
+  cand = g.update_candidates(cand, graph_log, 2, {5});
+  sort(cand.begin(), cand.end());
+  EXPECT_EQ(cand, VII({{0, 4}, {2, 4}, {2, 6}, {3, 4}}));
+
+  g.contract(0, 2, &graph_log);
+  cand = g.update_candidates(cand, graph_log, 2, {5});
+  sort(cand.begin(), cand.end());
+  EXPECT_EQ(cand, VII({{0, 4}, {3, 4}, {3, 6}, {4, 6}}));
 }
