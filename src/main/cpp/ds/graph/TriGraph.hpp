@@ -59,8 +59,7 @@ class TriGraph {
   //============================================================================
   //    Pairwise Properties
   //============================================================================
-  std::vector<std::vector<int>> ncn_;  // number of common neighbors
-  std::vector<std::vector<int>> ncr_;  // number of common red neighbors
+  std::vector<std::vector<int>> mu_;  // the mu value: mu(i,j) := 2 * (# of common neighbors of i and j) - (# of common red neighbors of i and j)
 
  public:
   TriGraph() : TriGraph({}, {}) {}
@@ -73,8 +72,7 @@ class TriGraph {
         num_black_edges_(0),
         num_red_edges_(0),
         hash_(0ULL),
-        ncn_(n_orig_, std::vector<int>(n_orig_)),
-        ncr_(n_orig_, std::vector<int>(n_orig_)) {
+        mu_(n_orig_, std::vector<int>(n_orig_)) {
     // initialize hash table
     util::initialize_hash_table();
 
@@ -132,8 +130,7 @@ class TriGraph {
     num_black_edges_ = other.num_black_edges_;
     num_red_edges_ = other.num_red_edges_;
     hash_ = other.hash_;
-    ncn_ = other.ncn_;
-    ncr_ = other.ncr_;
+    mu_ = other.mu_;
   }
 
   /**
@@ -416,7 +413,7 @@ class TriGraph {
    */
   int weak_red_potential(Vertex i, Vertex j) const {
     assert(i != j);
-    auto ret = degree(i) + degree(j) - 2 * ncn_[i][j] + ncr_[i][j] - (has_edge(i, j) ? 2 : 0);
+    auto ret = degree(i) + degree(j) - mu_[i][j] - (has_edge(i, j) ? 2 : 0);
     assert(ret >= 0);
     return ret;
   }
@@ -431,8 +428,7 @@ class TriGraph {
     for (int i = 0; i < n_orig_; ++i) {
       for (int j = i + 1; j < n_orig_; ++j) {
         auto common_neighbors = (adj_black_[i] | adj_red_[i]) & (adj_black_[j] | adj_red_[j]);
-        ncn_[i][j] = ncn_[j][i] = common_neighbors.size();
-        ncr_[i][j] = ncr_[j][i] = (common_neighbors & (adj_red_[i] | adj_red_[j])).size();
+        mu_[i][j] = mu_[j][i] = 2 * common_neighbors.size() - (common_neighbors & (adj_red_[i] | adj_red_[j])).size();
       }
     }
   }
@@ -477,110 +473,78 @@ class TriGraph {
     auto c3 = i_adj_r & j_adj_b;
     auto c4 = i_adj_r & j_adj_r;
 
-    auto a12 = a1 | a2;
-
     //--------------------------------------------------------------------------
-    // (1) Update the number of common neighbors
+    // I. Update mu values
     //--------------------------------------------------------------------------
-    for (auto a : a12) {
-      for (auto b : b1 | b2) {
-        ++ncn_[a][b];  // j becomes a new common neighbor of a and b
-        ++ncn_[b][a];
-        updated.push_back({std::min(a, b), std::max(a, b)});
-      }
-      for (auto v : adj_black_[a] | adj_red_[a]) {
-        if (v != i) {
-          ++ncn_[j][v];  // a becomes a new common neighbor of j and v
-          ++ncn_[v][j];
-          updated.push_back({std::min(j, v), std::max(j, v)});
-        }
-      }
-      if (edge_ij) {
-        --ncn_[j][a];  // i was a common neighbor
-        --ncn_[a][j];
-        updated.push_back({std::min(j, a), std::max(j, a)});
-      }
+    std::vector<std::pair<Edge, int>> mu_delta;
+
+    // clang-format off
+    // (1) A1 x (A1 | C1 | C2): -1
+    for (auto x : a1) for (auto y : a1) if (x < y) mu_delta.push_back({{x, y}, -1});
+    for (auto x : a1) for (auto y : c1 | c2) mu_delta.push_back({{x, y}, -1});
+
+    // (2) B1 x (C1 | C3 | B1): -1
+    for (auto x : b1) for (auto y : b1) if (x < y) mu_delta.push_back({{x, y}, -1});
+    for (auto x : b1) for (auto y : c1 | c3) mu_delta.push_back({{x, y}, -1});
+
+    // (3) C2 x C3: -1
+    for (auto x : c2) for (auto y : c3) mu_delta.push_back({{x, y}, -1});
+
+    // (4) C4 x (C1 | C2 | C3 | C4): -1
+    for (auto x : c4) for (auto y : c4) if (x < y) mu_delta.push_back({{x, y}, -1});
+    for (auto x : c4) for (auto y : c1 | c2 | c3) mu_delta.push_back({{x, y}, -1});
+
+    // (5) C2 x C2: -1
+    for (auto x : c2) for (auto y : c2) if (x < y) mu_delta.push_back({{x, y}, -2});
+
+    // (6) C1 x (C1 | C2 | C3): -2
+    for (auto x : c1) for (auto y : c1) if (x < y) mu_delta.push_back({{x, y}, -2});
+    for (auto x : c1) for (auto y : c2 | c3) mu_delta.push_back({{x, y}, -2});
+
+    // (7) C3 x C3: -2
+    for (auto x : c3) for (auto y : c3) if (x < y) mu_delta.push_back({{x, y}, -2});
+
+    // (8) (A1 | A2) x (B1 | B2): +1
+    for (auto x : a1 | a2) for (auto y : b1 | b2) mu_delta.push_back({{x, y}, 1});
+    // clang-format on
+
+    std::unordered_map<Vertex, int> mu_delta_j;
+    if (has_edge(i, j)) {
+      // (9) j x (A1 | C1 | C2): -1 or -2
+      for (auto x : a1 | c1 | c2) mu_delta_j[x] -= has_red_edge(i, j) ? 1 : 2;
+
+      // (10) j x (A2 | C3 | C4): -1
+      for (auto x : a2 | c3 | c4) mu_delta_j[x] -= 1;
     }
 
-    for (auto x : common_nbrs) {
-      for (auto y : common_nbrs) {
-        if (x == y) continue;
-        --ncn_[x][y];  // i was a common neighbor of x and y
-        updated.push_back({std::min(x, y), std::max(x, y)});
-      }
-    }
-
-    if (edge_ij) {
-      for (auto x : common_nbrs) {
-        --ncn_[j][x];  // i was a common neighbor of j and x
-        --ncn_[x][j];
-        updated.push_back({std::min(j, x), std::max(j, x)});
-      }
-    }
-
-    //--------------------------------------------------------------------------
-    // (2) Update the number of common red neighbors
-    //--------------------------------------------------------------------------
-    // (2a) red edges incident to i (including edge ij)
-    for (auto x : adj_red_[i]) {
-      for (auto y : adj_red_[i]) {
-        if (x == y) continue;
-        --ncr_[x][y];
-        updated.push_back({std::min(x, y), std::max(x, y)});
-      }
-      for (auto y : adj_black_[i]) {
-        --ncr_[x][y];
-        --ncr_[y][x];
-        updated.push_back({std::min(x, y), std::max(x, y)});
-      }
-    }
-
-    // (2b) for new red edge xj, j becomes a new common red neighbor of x and y for y <- N({i, j})
-    auto new_nbrs = a12 | c3 | b1;
-    for (auto x : new_nbrs) {
-      for (auto y : new_nbrs) {
-        if (x == y) continue;
-        ++ncr_[x][y];
-        updated.push_back({std::min(x, y), std::max(x, y)});
-      }
-    }
-
-    for (auto x : a12) {
-      for (auto y : c1 | c2 | c4 | b2) {
-        ++ncr_[x][y];
-        ++ncr_[y][x];
-        updated.push_back({std::min(x, y), std::max(x, y)});
-      }
-    }
-
-    for (auto x : c3 | b1) {
-      for (auto y : c1) {
-        ++ncr_[x][y];
-        ++ncr_[y][x];
-        updated.push_back({std::min(x, y), std::max(x, y)});
-      }
-    }
-
-    // (2c) for new red edge xj, x becomes a new common red neighbor of y and j for y <- N_B(x)
-    for (auto x : a12) {
+    // (11) j x N(A1 | A2): +1    new red edge between j and x <- (A1 | A2)
+    for (auto x : a1 | a2) {
       for (auto y : adj_black_[x] | adj_red_[x]) {
-        if (y == i) continue;
-        ++ncr_[y][j];
-        ++ncr_[j][y];
-        updated.push_back({std::min(y, j), std::max(y, j)});
+        if (y != i) mu_delta_j[y] += 1;
       }
     }
+
+    // (12) j x N_B(C3 | B1): -1    new red edge between j and x <- (C3 | B1)
     for (auto x : c3 | b1) {
       for (auto y : adj_black_[x]) {
-        if (y == j) continue;
-        ++ncr_[y][j];
-        ++ncr_[j][y];
-        updated.push_back({std::min(y, j), std::max(y, j)});
+        if (j != y) {
+          assert(y != i);
+          mu_delta_j[y] -= 1;
+        }
       }
     }
 
+    for (auto& p : mu_delta_j) mu_delta.push_back({{j, p.first}, p.second});
+
+    for (auto& p : mu_delta) {
+      auto u = p.first.first;
+      auto v = p.first.second;
+      mu_[u][v] += p.second;
+      mu_[v][u] += p.second;
+    }
+
     //--------------------------------------------------------------------------
-    // (3) Make changes
+    // II. Make changes
     //--------------------------------------------------------------------------
     // remove edge ij if exists
     if (edge_ij) {
@@ -598,7 +562,7 @@ class TriGraph {
     }
 
     // add red edges {j, w| w <- N(i) - N(j)}
-    for (int w : a12) {
+    for (int w : a1 | a2) {
       //
       add_red_edge(j, w);
     }
@@ -658,22 +622,14 @@ class TriGraph {
     auto h = *this;
     h.compute_pairwise_properties();
 
-    auto ncn = ncn_;
-    auto ncr = ncr_;
+    auto mu = mu_;
     for (int i = 0; i < n_orig_; ++i) {
       if (has_vertex(i)) continue;
-      for (auto j = 0; j < n_orig_; ++j) {
-        ncn[i][j] = ncn[j][i] = 0;
-        ncr[i][j] = ncr[j][i] = 0;
-      }
-    }
-    if (h.ncn_ != ncn) {
-      log_debug("Found inconsistency in ncn: expected=%s, actual=%s", cstr(h.ncn_), cstr(ncn_));
-      throw std::runtime_error("error in TriGraph#check_consistency()");
+      for (auto j = 0; j < n_orig_; ++j) mu[i][j] = mu[j][i] = 0;
     }
 
-    if (h.ncr_ != ncr) {
-      log_debug("Found inconsistency in ncr: expected=%s, actual=%s", cstr(h.ncr_), cstr(ncr_));
+    if (h.mu_ != mu) {
+      log_debug("Found inconsistency in mu: expected=%s, actual=%s", cstr(h.mu_), cstr(mu_));
       throw std::runtime_error("error in TriGraph#check_consistency()");
     }
   }
