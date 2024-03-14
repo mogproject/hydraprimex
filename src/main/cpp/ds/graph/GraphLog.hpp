@@ -1,6 +1,8 @@
 #pragma once
-
+#include <unordered_map>
 #include <vector>
+
+#include "ds/set/FastSet.hpp"
 
 namespace ds {
 namespace graph {
@@ -21,6 +23,7 @@ class GraphLog {
   std::vector<int> new_neighbors;  // set of j's new neighbors
   std::vector<int> recolored;      // set of j's neighbors k such that edge jk turns red from black
   std::vector<std::pair<std::pair<int, int>, int>> mu_delta;  // changes in mu values
+  std::vector<std::pair<int, int>> potential_decreased;  // set of vertex pairs whose weak red potential has decreased
 };
 }  // namespace graph
 }  // namespace ds

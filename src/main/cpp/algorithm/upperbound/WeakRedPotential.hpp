@@ -62,7 +62,7 @@ class WeakRedPotential {
     int ret = graph_.contract(j, i, &graph_log);
 
     // enqueue vertex pairs
-    for (auto &p : graph_log.mu_delta) update_element(p.first.first, p.first.second);
+    for (auto &p : graph_log.potential_decreased) update_element(p.first, p.second);
     return ret;
   }
 

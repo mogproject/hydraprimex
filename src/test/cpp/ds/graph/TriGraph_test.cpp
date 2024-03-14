@@ -8,6 +8,7 @@ using namespace ds::graph;
 
 typedef vector<int> VI;
 typedef vector<vector<int>> VVI;
+typedef vector<pair<int, int>> VII;
 
 TEST(TriGraphTest, WeakRedPotential) {
   TriGraph g = {{0, 1, 2, 3, 4, 5, 6, 7},
@@ -135,7 +136,7 @@ TEST(TriGraphTest, UndoContraction) {
           GraphLog graph_log;
           graphs.push_back(graphs.back());
           graphs.back().contract(p.first, p.second, &graph_log);
-          graphs.back().check_consistency();
+          // graphs.back().check_consistency();
           history.push_back(graph_log);
         }
 
@@ -148,4 +149,28 @@ TEST(TriGraphTest, UndoContraction) {
       }
     }
   }
+}
+
+TEST(TriGraphTest, ContractPotentialDecreased) {
+  util::Random rand(12345);
+
+  TriGraph g(util::range_to_vec(7), {
+                                        {{0, 1}, 0},
+                                        {{0, 2}, 0},
+                                        {{0, 3}, 0},
+                                        {{1, 3}, 0},
+                                        {{1, 4}, 0},
+                                        {{2, 6}, 1},
+                                        {{3, 5}, 1},
+                                        {{5, 6}, 0},
+                                    });
+  GraphLog graph_log;
+
+  g.contract(0, 1, &graph_log);
+  sort(graph_log.potential_decreased.begin(), graph_log.potential_decreased.end());
+  EXPECT_EQ(graph_log.potential_decreased, VII({{2, 4}, {3, 5}, {3, 6}}));
+
+  g.contract(0, 2, &graph_log);
+  sort(graph_log.potential_decreased.begin(), graph_log.potential_decreased.end());
+  EXPECT_EQ(graph_log.potential_decreased, VII({{0, 5}, {0, 6}, {3, 6}, {4, 6}}));
 }

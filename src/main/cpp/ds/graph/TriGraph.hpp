@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ds/graph/GraphLog.hpp"
+#include "ds/set/FastSet.hpp"
 #include "ds/set/SortedVectorSet.hpp"
 #include "util/hash_table.hpp"
 #include "util/logger.hpp"
@@ -545,12 +546,48 @@ class TriGraph {
       }
     }
 
-    for (auto& p : mu_delta_j) mu_delta.push_back({{j, p.first}, p.second});
+    for (auto& p : mu_delta_j) {
+      if (p.second != 0) mu_delta.push_back({{j, p.first}, p.second});
+    }
 
     //--------------------------------------------------------------------------
-    // II. Save information for rollback
+    // II. Save graph log
     //--------------------------------------------------------------------------
     if (graph_log) {
+      // track changes in weak red potential
+      std::unordered_map<int, int> wrp_delta;
+      ds::set::FastSet common_nbrs_set(n_orig_);
+      for (auto x : common_nbrs) common_nbrs_set.set(x);
+
+      for (auto& p : mu_delta) wrp_delta[key(n_orig_, p.first.first, p.first.second)] = -p.second;
+
+      // apply changes in degrees
+      int j_deg_delta = a1.size() + a2.size() - edge_ij;
+      for (auto x : vertices_) {  // j x V
+        if (x != i && x != j) wrp_delta[key(n_orig_, j, x)] += j_deg_delta;
+      }
+
+      for (auto x : common_nbrs) {
+        for (auto y : vertices_) {
+          if (y == i || y == j) continue;
+          if (common_nbrs_set.get(y)) {  // C x C
+            if (x < y) wrp_delta[key(n_orig_, x, y)] -= 2;
+          } else {  // C x (V-C-j)
+            wrp_delta[key(n_orig_, x, y)] -= 1;
+          }
+        }
+      }
+
+      // apply changes in new edges
+      for (auto x : a1 | a2) wrp_delta[key(n_orig_, j, x)] -= 2;
+
+      // collect the set of vertices whose weak red potential has decreased
+      std::vector<std::pair<int, int>> potential_decreased;
+      for (auto& p : wrp_delta) {
+        if (p.second < 0) potential_decreased.push_back({p.first / n_orig_, p.first % n_orig_});
+      }
+
+      // save values
       graph_log->log_type = GraphLogType::CONTRACTION;
       graph_log->merge = j;
       graph_log->merged = i;
@@ -559,6 +596,7 @@ class TriGraph {
       graph_log->new_neighbors = (a1 | a2).to_vector();
       graph_log->recolored = (b1 | c3).to_vector();
       graph_log->mu_delta = mu_delta;
+      graph_log->potential_decreased = potential_decreased;
     }
 
     //--------------------------------------------------------------------------
@@ -778,6 +816,8 @@ class TriGraph {
     assert(static_cast<int>(ret.size()) == (color == Black ? num_black_edges_ : num_red_edges_));
     return ret;
   }
+
+  inline int key(int n, int i, int j) const { return n * std::min(i, j) + std::max(i, j); }
 };
 }  // namespace graph
 }  // namespace ds
