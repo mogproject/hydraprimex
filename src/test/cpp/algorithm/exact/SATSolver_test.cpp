@@ -5,7 +5,7 @@
 
 using namespace std;
 
-void verify_instance(char const* pattern, int index, int n, int tww) {
+static void verify_instance(char const* pattern, int index, int n, int tww) {
   util::Random rand(12345);
   for (int s = 0; s < n; ++s) {
     auto path = util::format(pattern, index, index, s);
