@@ -42,7 +42,7 @@ TEST(LBGreedyTest, RunWithTinyInstances) {
 TEST(LBGreedyTest, RunWithReducedInstances) {
   util::Random rand(12345);
 
-  auto inst = readwrite::load_pace_extended("src/test/resources/pace2023/exact_056_twwe.gr");
+  auto inst = readwrite::load_pace_extended("src/test/resources/small/008/small008.gr");
 
   algorithm::lowerbound::LBGreedy solver;
   algorithm::reduction::Reducer reducer;

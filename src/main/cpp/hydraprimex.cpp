@@ -64,11 +64,12 @@ int main(int argc, char* argv[]) {
 
       if (cs.size() + 1 != instance.graph.number_of_vertices()) {
         if (tww == instance.upper_bound_tww) {
-          log_success("Given upper bound is optimal (no output): tww=%d, elapsed=%.3fs", tww, root_timer.stop());
+          log_success("Given upper bound is optimal (no output): tww=%d, elapsed=%.3fs, path=%s", tww,
+                      root_timer.stop(), conf.input_path.c_str());
         } else {
           // something is wrong
-          log_critical("Possible bug: elapsed=%.3fs, n=%lu, cs.size=%lu, cs=%s", root_timer.stop(),
-                       instance.graph.number_of_vertices(), cs.size(), cstr(cs));
+          log_critical("Possible bug: elapsed=%.3fs, n=%lu, cs.size=%lu, cs=%s, path=%s", root_timer.stop(),
+                       instance.graph.number_of_vertices(), cs.size(), cstr(cs), conf.input_path.c_str());
           status_code = 3;
         }
       } else {
@@ -82,7 +83,7 @@ int main(int argc, char* argv[]) {
             log_warning("Contraction width is below the given lower bound: tww=%d, lb=%d", tww, instance.lower_bound_tww);
           }
 
-          log_success("Found a solution: tww=%d, elapsed=%.3fs", tww, root_timer.stop());
+          log_success("Found a solution: tww=%d, elapsed=%.3fs, path=%s", tww, root_timer.stop(), conf.input_path.c_str());
 
           // output results
           if (conf.tww_mode) {
@@ -99,14 +100,14 @@ int main(int argc, char* argv[]) {
       }
     } else {
       // not resolved
-      log_error("Could not find a solution: elapsed=%.3fs", root_timer.stop());
+      log_error("Could not find a solution: elapsed=%.3fs, path=%s", root_timer.stop(), conf.input_path.c_str());
       status_code = 2;
     }
   } catch (std::invalid_argument const& e) {
-    log_critical("Solver error: invalid_argument: %s", e.what());
+    log_critical("Solver error: invalid_argument: %s, path=%s", e.what(), conf.input_path.c_str());
     status_code = 3;
   } catch (std::exception const& e) {  //
-    log_critical("Solver error: %s", e.what());
+    log_critical("Solver error: %s, path=%s", e.what(), conf.input_path.c_str());
     status_code = 3;
   }
 

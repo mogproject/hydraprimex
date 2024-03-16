@@ -37,7 +37,7 @@ def get_parser():
     parser = argparse.ArgumentParser(description='Simulate contractions and output a partial trigraph.')
     parser.add_argument('-v', '--version', action='version', version=f'%(prog)s {__version__}')
     parser.add_argument('graph_path', help='input graph file')
-    parser.add_argument('contraction_path', help='input contraction file')
+    parser.add_argument('contraction_path', nargs='?', help='input contraction file')
     parser.add_argument('-s', '--steps', type=int, default=0, help='number of steps to simulate (default: 0)')
     parser.add_argument('--log-level', choices=LOG_LEVELS.keys(), default='info', help='log level')
     parser.add_argument('--no-color', action='store_true', help='disables log coloring')
@@ -68,15 +68,20 @@ def main(args):
     m = G.number_of_edges()
     logger.info(f'Loaded graph: path={args.graph_path}, n={n}, m={m}')
 
-    # load contraction file
-    cs = load_contractions(args.contraction_path)
-    logger.info(f'Loaded contractions: path={args.contraction_path}')
-
-    # simulate contractions
     steps = args.steps
-    if steps > n - 1:
-        logger.warning(f'Too large steps. Reset to: {n - 1}')
-        steps = min(n - 1, args.steps)
+    if steps > 0:
+        if args.contraction_path is None:
+            logger.error('contraction_path is required when steps > 0')
+            return
+
+        # load contraction file
+        cs = load_contractions(args.contraction_path)
+        logger.info(f'Loaded contractions: path={args.contraction_path}')
+
+        # simulate contractions
+        if steps > n - 1:
+            logger.warning(f'Too large steps. Reset to: {n - 1}')
+            steps = min(n - 1, args.steps)
 
     initialize_trigraph(G)
     max_red_deg = 0
