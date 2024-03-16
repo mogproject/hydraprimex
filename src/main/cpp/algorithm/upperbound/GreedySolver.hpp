@@ -53,10 +53,12 @@ class GreedySolver : public base::BaseSolver {
 
     util::Timer timer(time_limit_sec_, root_timer_);
     int time_limit = timer.get_effective_time_limit();
+    if (time_limit == 0) return;  // already timed out
+    time_limit = std::max(0, time_limit);
 
-    log_info("%s GreedySolver started: n=%lu, num_iterations=%d, time_limit=%ds, volat=%d, perm=%d",
-             state.label(graph_id).c_str(), state.get_graph(graph_id).number_of_vertices(), num_iterations_, time_limit,
-             volatility_rate_, permissiveness_);
+    log_info("%s GreedySolver started: n=%lu, num_iterations=%d, time_limit=%s, volat=%d, perm=%d",
+             state.label(graph_id).c_str(), state.get_graph(graph_id).number_of_vertices(), num_iterations_,
+             time_limit > 0 ? util::format("%ds", time_limit).c_str() : "N/A", volatility_rate_, permissiveness_);
 
     // set alarm
     if (time_limit > 0) greedy::set_timeout(time_limit);

@@ -70,10 +70,13 @@ class BranchSolver : public base::BaseSolver {
 
     util::Timer timer(time_limit_sec_, root_timer_);
     int time_limit = timer.get_effective_time_limit();
+    if (time_limit == 0) return;  // already timed out
+    time_limit = std::max(0, time_limit);
+
     auto& g = state.get_graph(graph_id);
 
-    log_info("%s BranchSolver started: n=%lu, time_limit=%ds, counter_limit=%lld", state.label(graph_id).c_str(),
-             g.number_of_vertices(), time_limit, counter_limit_);
+    log_info("%s BranchSolver started: n=%lu, time_limit=%s, counter_limit=%lld", state.label(graph_id).c_str(),
+             g.number_of_vertices(), time_limit > 0 ? util::format("%ds", time_limit).c_str() : "N/A", counter_limit_);
 
     // set alarm
     if (time_limit > 0) branch::set_timeout(time_limit);

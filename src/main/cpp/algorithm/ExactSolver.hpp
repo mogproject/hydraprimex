@@ -37,12 +37,16 @@ class ExactSolver : public base::BaseSolver {
     //--------------------------------------------------------------------------
     //    Run solvers
     //--------------------------------------------------------------------------
+    std::unordered_set<int> visited;
     bool timed_out = false;
     while (!timed_out) {
       if ((graph_id = state.get_unresolved_graph_id()) < 0) {
-        // all done
-        break;
+        break;  // all done
       }
+
+      // do not visit the same graph twice
+      if (util::contains(visited, graph_id)) break;
+      visited.insert(graph_id);
 
       for (std::size_t i = 0; i < solvers.size(); ++i) {
         solvers[i]->run(state, graph_id, rand);

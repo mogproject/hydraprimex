@@ -24,7 +24,9 @@ class SATSolver : public base::BaseSolver {
     if (state.resolved(graph_id)) return;  // already resolved
 
     util::Timer timer(time_limit_sec_, root_timer_);
-    auto time_limit_sec = timer.get_effective_time_limit();
+    auto time_limit = timer.get_effective_time_limit();
+    if (time_limit == 0) return;  // already timed out
+    time_limit = std::max(0, time_limit);
 
     auto& g = state.get_graph(graph_id);
     n_ = g.number_of_vertices();
@@ -32,14 +34,13 @@ class SATSolver : public base::BaseSolver {
     auto ub = state.get_upper_bound(graph_id);
 
     log_info("%s SATSolver started: n=%ld, m=%ld, lb=%d, ub=%d, time_limit=%s", state.label(graph_id).c_str(),
-             g.number_of_vertices(), g.number_of_edges(), lb, ub,
-             time_limit_sec > 0 ? util::format("%ds", time_limit_sec).c_str() : "N/A");
+             g.number_of_vertices(), g.number_of_edges(), lb, ub, time_limit > 0 ? util::format("%ds", time_limit).c_str() : "N/A");
 
     bool timed_out = false;
     for (int d = lb; !timed_out && (ub < 0 || d < ub); ++d) {
       log_trace("%s SATSolver checking d=%d", state.label(graph_id).c_str(), d);
 
-      auto result = solve(state, graph_id, d, time_limit_sec);
+      auto result = solve(state, graph_id, d, time_limit);
       if (result == sat::status::SATISFIABLE) {
         break;
       } else if (result == sat::status::INCONSISTENT || result == sat::status::INCONSISTENT_AND_CORE_COMPUTED) {

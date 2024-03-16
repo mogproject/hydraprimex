@@ -21,19 +21,24 @@ class Timer {
 
  public:
   Timer(int time_limit_sec = 0, Timer const* parent_timer = nullptr)
-      : parent_timer_(parent_timer), started_(std::chrono::system_clock::now()), effective_time_limit_(0) {
+      : parent_timer_(parent_timer), started_(std::chrono::system_clock::now()), effective_time_limit_(-1) {
     set_time_limit(time_limit_sec);
   }
 
+  /**
+   * @brief Sets the time limit to the given duration.
+   *
+   * @param time_limit_sec time limit
+   * @return int Effective time limit; -1 if no time limit, duration in seconds otherwise.
+   *             The value may be shorter than the given value if the parent timer ends earlier.
+   */
   int set_time_limit(int time_limit_sec) {
     auto parent_remain = parent_timer_ ? parent_timer_->get_remain_sec() : INFINITY;
     auto time_limit = time_limit_sec > 0 ? static_cast<double>(time_limit_sec) : INFINITY;
-    if (std::isinf(parent_remain) && std::isinf(time_limit)) {
-      time_limit_enabled_ = false;
-      return 0;
-    }
 
-    time_limit_enabled_ = true;
+    time_limit_enabled_ = !std::isinf(parent_remain) || !std::isinf(time_limit);
+    if (!time_limit_enabled_) return -1;  // no time limit
+
     effective_time_limit_ = static_cast<int>(std::floor(std::min(time_limit, parent_remain)));
     time_limit_ = started_ + Sec(effective_time_limit_);
 
