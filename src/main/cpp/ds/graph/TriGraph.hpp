@@ -178,10 +178,12 @@ class TriGraph {
    */
   std::size_t number_of_red_edges() const { return num_red_edges_; }
 
- private:
   //============================================================================
   //    Hashing
   //============================================================================
+  uint64_t hash() const { return hash_; }
+
+ private:
   inline uint64_t vertex_hash(int i) const {
     auto mod = 1 << (util::HASH_TABLE_BITS - 1);
     return util::get_hash(mod + i % mod);
@@ -432,15 +434,21 @@ class TriGraph {
 
   int outer_red_potential(Vertex i, Vertex j) const {
     int ret = -1;
-    for (auto v : adj_black_[i] ^ adj_black_[j]) ret = std::max(ret, red_degree(v));
-    return ret >= 0 ? ret + 1 : 0;
+    auto a1b1 = (adj_black_[i] ^ adj_black_[j]) - adj_red_[i] - adj_red_[j] - i - j;
+    for (auto v : a1b1) ret = std::max(ret, red_degree(v));
+    return ret + 1;
   }
 
   void compute_pairwise_properties() {
-    for (int i = 0; i < n_orig_; ++i) {
-      for (int j = i + 1; j < n_orig_; ++j) {
-        auto common_neighbors = (adj_black_[i] | adj_red_[i]) & (adj_black_[j] | adj_red_[j]);
-        mu_[i][j] = mu_[j][i] = 2 * common_neighbors.size() - (common_neighbors & (adj_red_[i] | adj_red_[j])).size();
+    // We may not change any entries for removed vertices.
+    int n = number_of_vertices();
+    auto vs = vertices();
+    for (int i = 0; i < n; ++i) {
+      auto u = vs[i];
+      for (int j = i + 1; j < n; ++j) {
+        auto v = vs[j];
+        auto common_neighbors = (adj_black_[u] | adj_red_[u]) & (adj_black_[v] | adj_red_[v]);
+        mu_[u][v] = mu_[v][u] = 2 * common_neighbors.size() - (common_neighbors & (adj_red_[u] | adj_red_[v])).size();
       }
     }
   }
@@ -569,10 +577,10 @@ class TriGraph {
 
       for (auto x : common_nbrs) {
         for (auto y : vertices_) {
-          if (y == i || y == j) continue;
+          if (y == i) continue;
           if (common_nbrs_set.get(y)) {  // C x C
             if (x < y) wrp_delta[key(n_orig_, x, y)] -= 2;
-          } else {  // C x (V-C-j)
+          } else {  // C x (V-C)  [including C x j]
             wrp_delta[key(n_orig_, x, y)] -= 1;
           }
         }
@@ -687,7 +695,8 @@ class TriGraph {
    * @return std::vector<std::pair<Vertex, Vertex>> contraction candidates
    */
   std::vector<std::pair<Vertex, Vertex>> find_candidates(int upper_bound, VertexList const& frozen_vertices = {}) const {
-    static ds::set::FastSet frozen(n_orig_);
+    static ds::set::FastSet frozen;
+    frozen.resize(n_orig_);
     for (auto x : frozen_vertices) frozen.set(x);
 
     VertexList vs;
@@ -778,29 +787,6 @@ class TriGraph {
   }
 
   //============================================================================
-  //    Debugging
-  //============================================================================
-  /**
-   * @brief Assert that the properties `ncn_` and `ncr_` are consistent
-   * with the current graph.
-   */
-  void check_consistency() const {
-    auto h = *this;
-    h.compute_pairwise_properties();
-
-    auto mu = mu_;
-    for (int i = 0; i < n_orig_; ++i) {
-      if (has_vertex(i)) continue;
-      for (auto j = 0; j < n_orig_; ++j) mu[i][j] = mu[j][i] = 0;
-    }
-
-    if (h.mu_ != mu) {
-      log_debug("Found inconsistency in mu: expected=%s, actual=%s", cstr(h.mu_), cstr(mu_));
-      throw std::runtime_error("error in TriGraph#check_consistency()");
-    }
-  }
-
-  //============================================================================
   //    Reduction Rules
   //============================================================================
   /**
@@ -860,6 +846,23 @@ class TriGraph {
 
     // need to recompute properties
     compute_pairwise_properties();
+  }
+
+  //============================================================================
+  //    Debugging
+  //============================================================================
+  /**
+   * @brief Assert that the properties `ncn_` and `ncr_` are consistent
+   * with the current graph.
+   */
+  void check_consistency() const {
+    auto h = *this;
+    h.compute_pairwise_properties();
+
+    if (h.mu_ != mu_) {
+      log_debug("Found inconsistency in mu: expected=%s, actual=%s", cstr(h.mu_), cstr(mu_));
+      throw std::runtime_error("error in TriGraph#check_consistency()");
+    }
   }
 
   //============================================================================

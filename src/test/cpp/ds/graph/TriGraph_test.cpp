@@ -198,6 +198,22 @@ TEST(TriGraphTest, UpdateCandidates) {
   cand = g.update_candidates(cand, graph_log, 2);
   sort(cand.begin(), cand.end());
   EXPECT_EQ(cand, VII({{0, 4}, {3, 4}, {3, 5}, {3, 6}, {4, 6}, {5, 6}}));
+
+  TriGraph star(util::range_to_vec(4), {{{0, 1}, 0}, {{0, 2}, 0}, {{0, 3}, 0}});
+  cand = star.find_candidates(0);
+  EXPECT_EQ(cand, VII({{1, 2}, {1, 3}, {2, 3}}));
+
+  star.contract(2, 1, &graph_log);
+  cand = star.update_candidates(cand, graph_log, 0);
+  EXPECT_EQ(cand, VII({{2, 3}}));
+
+  star.contract(3, 2, &graph_log);
+  cand = star.update_candidates(cand, graph_log, 0);
+  EXPECT_EQ(cand, VII({{0, 3}}));
+
+  TriGraph k2(util::range_to_vec(2), {{{0, 1}, 0}});
+  cand = k2.find_candidates(0);
+  EXPECT_EQ(cand, VII({{0, 1}}));
 }
 
 TEST(TriGraphTest, UpdateCandidatesWithFrozen) {
@@ -225,4 +241,34 @@ TEST(TriGraphTest, UpdateCandidatesWithFrozen) {
   cand = g.update_candidates(cand, graph_log, 2, {5});
   sort(cand.begin(), cand.end());
   EXPECT_EQ(cand, VII({{0, 4}, {3, 4}, {3, 6}, {4, 6}}));
+}
+
+TEST(TriGraphTest, OuterRedPotential) {
+  TriGraph g(util::range_to_vec(8), {
+                                        {{0, 2}, 1},
+                                        {{0, 3}, 0},
+                                        {{1, 2}, 0},
+                                        {{1, 3}, 1},
+                                        {{2, 4}, 1},
+                                        {{2, 5}, 1},
+                                        {{3, 4}, 1},
+                                        {{3, 5}, 1},
+                                        {{6, 2}, 0},
+                                        {{7, 3}, 0},
+                                        {{6, 7}, 1},
+                                    });
+  EXPECT_EQ(g.outer_red_potential(0, 1), 0);
+  EXPECT_EQ(g.outer_red_potential(6, 7), 4);
+  EXPECT_EQ(g.outer_red_potential(6, 0), 4);
+  EXPECT_EQ(g.outer_red_potential(6, 1), 0);
+}
+
+TEST(TriGraphTest, IsFreeContraction) {
+  TriGraph g1(util::range_to_vec(2), {});
+  TriGraph g2(util::range_to_vec(2), {{{0, 1}, 0}});
+  TriGraph g3(util::range_to_vec(2), {{{0, 1}, 1}});
+
+  EXPECT_TRUE(g1.is_free_contraction(0, 1));
+  EXPECT_TRUE(g2.is_free_contraction(0, 1));
+  EXPECT_TRUE(g3.is_free_contraction(0, 1));
 }
