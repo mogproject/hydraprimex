@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "algorithm/exact/SATSolver.hpp"
+#include "algorithm/exact/BranchSolver.hpp"
 #include "readwrite/pace_extended.hpp"
 
 using namespace std;
@@ -13,7 +13,7 @@ static void verify_instance(char const* pattern, int index, int n, int tww) {
 
     log_info("---------- %s", path.c_str());
     algorithm::base::SolverState state(inst);
-    algorithm::exact::SATSolver solver;
+    algorithm::exact::BranchSolver solver;
     solver.run(state, 0, rand);
 
     EXPECT_TRUE(state.resolved());
@@ -25,7 +25,7 @@ static void verify_instance(char const* pattern, int index, int n, int tww) {
   }
 }
 
-TEST(SATSolverTest, RunWithTinyInstances) {
+TEST(BranchSolverTest, RunWithTinyInstances) {
   char const* pattern = "src/test/resources/tiny-set/%03d/tiny%03d-s%d.gr";
 
   util::set_log_level(util::logging::LogLevel::NONE);
@@ -33,30 +33,31 @@ TEST(SATSolverTest, RunWithTinyInstances) {
   verify_instance(pattern, 2, 10, 2);
   verify_instance(pattern, 3, 10, 0);
   verify_instance(pattern, 4, 10, 0);
-  // verify_instance(pattern, 5, 25, 3);
+  verify_instance(pattern, 5, 25, 3);
   verify_instance(pattern, 6, 10, 0);
-  // verify_instance(pattern, 7, 25, 2);
+  verify_instance(pattern, 7, 25, 2);
   verify_instance(pattern, 8, 10, 4);
   verify_instance(pattern, 9, 9, 1);
   verify_instance(pattern, 10, 20, 2);
   util::set_log_level(util::logging::LogLevel::TRACE);
 }
 
-TEST(SATSolverTest, RunWithSmallInstances) {
+TEST(BranchSolverTest, RunWithSmallInstances) {
   char const* pattern = "src/test/resources/small/%03d/small%03d-s%d.gr";
 
   util::set_log_level(util::logging::LogLevel::NONE);
   verify_instance(pattern, 1, 8, 1);
   verify_instance(pattern, 2, 18, 2);
+  verify_instance(pattern, 3, 10, 6);
   util::set_log_level(util::logging::LogLevel::TRACE);
 }
 
-TEST(SATSolverTest, RunWithMissingVertices) {
+TEST(BranchSolverTest, RunWithMissingVertices) {
   util::Random rand(12345);
 
   auto inst = readwrite::load_pace_extended("src/test/resources/small/002/small002-s8.gr");
   inst.graph.contract(5, 1);
-  algorithm::exact::SATSolver solver;
+  algorithm::exact::BranchSolver solver;
 
   util::set_log_level(util::logging::LogLevel::NONE);
   algorithm::base::SolverState state({inst.graph, inst.lower_bound_tww, inst.upper_bound_tww});

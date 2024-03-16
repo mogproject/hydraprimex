@@ -8,6 +8,7 @@ using namespace ds::graph;
 
 typedef vector<int> VI;
 typedef vector<vector<int>> VVI;
+typedef vector<pair<int, int>> VII;
 
 TEST(TriGraphTest, WeakRedPotential) {
   TriGraph g = {{0, 1, 2, 3, 4, 5, 6, 7},
@@ -114,4 +115,160 @@ TEST(TriGraphTest, Contract) {
       }
     }
   }
+}
+
+TEST(TriGraphTest, UndoContraction) {
+  util::Random rand(1234567);
+
+  for (auto pr : vector<double>({0.2, 0.5})) {
+    for (auto n : vector<int>({5, 10, 30})) {
+      for (int t = 0; t < 20; ++t) {
+        // create a random graph
+        auto g = generator::erdos_renyi_graph(n, pr, rand);
+
+        // create a random contraction sequence
+        auto seq = random_contraction_sequence(n, rand);
+
+        vector<TriGraph> graphs = {g};
+        vector<GraphLog> history;
+
+        for (auto &p : seq) {
+          GraphLog graph_log;
+          graphs.push_back(graphs.back());
+          graphs.back().contract(p.first, p.second, &graph_log);
+          // graphs.back().check_consistency();
+          history.push_back(graph_log);
+        }
+
+        // undo
+        for (int i = n - 2; i >= 0; --i) {
+          graphs[i + 1].undo(history[i]);
+          graphs[i + 1].check_consistency();
+          EXPECT_EQ(graphs[i], graphs[i + 1]);
+        }
+      }
+    }
+  }
+}
+
+TEST(TriGraphTest, ContractPotentialDecreased) {
+  TriGraph g(util::range_to_vec(7), {
+                                        {{0, 1}, 0},
+                                        {{0, 2}, 0},
+                                        {{0, 3}, 0},
+                                        {{1, 3}, 0},
+                                        {{1, 4}, 0},
+                                        {{2, 6}, 1},
+                                        {{3, 5}, 1},
+                                        {{5, 6}, 0},
+                                    });
+  GraphLog graph_log;
+
+  g.contract(0, 1, &graph_log);
+  sort(graph_log.potential_decreased.begin(), graph_log.potential_decreased.end());
+  EXPECT_EQ(graph_log.potential_decreased, VII({{2, 4}, {3, 5}, {3, 6}}));
+
+  g.contract(0, 2, &graph_log);
+  sort(graph_log.potential_decreased.begin(), graph_log.potential_decreased.end());
+  EXPECT_EQ(graph_log.potential_decreased, VII({{0, 5}, {0, 6}, {3, 6}, {4, 6}}));
+}
+
+TEST(TriGraphTest, UpdateCandidates) {
+  TriGraph g(util::range_to_vec(7), {
+                                        {{0, 1}, 0},
+                                        {{0, 2}, 0},
+                                        {{0, 3}, 0},
+                                        {{1, 3}, 0},
+                                        {{1, 4}, 0},
+                                        {{2, 6}, 1},
+                                        {{3, 5}, 1},
+                                        {{5, 6}, 0},
+                                    });
+  GraphLog graph_log;
+
+  auto cand = g.find_candidates(2);
+  EXPECT_EQ(cand, VII({{0, 1}, {0, 3}, {0, 4}, {1, 3}, {1, 4}, {2, 6}, {3, 4}, {5, 6}}));
+
+  g.contract(0, 1, &graph_log);
+  cand = g.update_candidates(cand, graph_log, 2);
+  sort(cand.begin(), cand.end());
+  EXPECT_EQ(cand, VII({{0, 4}, {2, 4}, {2, 6}, {3, 4}, {3, 5}, {5, 6}}));
+
+  g.contract(0, 2, &graph_log);
+  cand = g.update_candidates(cand, graph_log, 2);
+  sort(cand.begin(), cand.end());
+  EXPECT_EQ(cand, VII({{0, 4}, {3, 4}, {3, 5}, {3, 6}, {4, 6}, {5, 6}}));
+
+  TriGraph star(util::range_to_vec(4), {{{0, 1}, 0}, {{0, 2}, 0}, {{0, 3}, 0}});
+  cand = star.find_candidates(0);
+  EXPECT_EQ(cand, VII({{1, 2}, {1, 3}, {2, 3}}));
+
+  star.contract(2, 1, &graph_log);
+  cand = star.update_candidates(cand, graph_log, 0);
+  EXPECT_EQ(cand, VII({{2, 3}}));
+
+  star.contract(3, 2, &graph_log);
+  cand = star.update_candidates(cand, graph_log, 0);
+  EXPECT_EQ(cand, VII({{0, 3}}));
+
+  TriGraph k2(util::range_to_vec(2), {{{0, 1}, 0}});
+  cand = k2.find_candidates(0);
+  EXPECT_EQ(cand, VII({{0, 1}}));
+}
+
+TEST(TriGraphTest, UpdateCandidatesWithFrozen) {
+  TriGraph g(util::range_to_vec(7), {
+                                        {{0, 1}, 0},
+                                        {{0, 2}, 0},
+                                        {{0, 3}, 0},
+                                        {{1, 3}, 0},
+                                        {{1, 4}, 0},
+                                        {{2, 6}, 1},
+                                        {{3, 5}, 1},
+                                        {{5, 6}, 0},
+                                    });
+  GraphLog graph_log;
+
+  auto cand = g.find_candidates(2, {5});
+  EXPECT_EQ(cand, VII({{0, 1}, {0, 3}, {0, 4}, {1, 3}, {1, 4}, {2, 6}, {3, 4}}));
+
+  g.contract(0, 1, &graph_log);
+  cand = g.update_candidates(cand, graph_log, 2, {5});
+  sort(cand.begin(), cand.end());
+  EXPECT_EQ(cand, VII({{0, 4}, {2, 4}, {2, 6}, {3, 4}}));
+
+  g.contract(0, 2, &graph_log);
+  cand = g.update_candidates(cand, graph_log, 2, {5});
+  sort(cand.begin(), cand.end());
+  EXPECT_EQ(cand, VII({{0, 4}, {3, 4}, {3, 6}, {4, 6}}));
+}
+
+TEST(TriGraphTest, OuterRedPotential) {
+  TriGraph g(util::range_to_vec(8), {
+                                        {{0, 2}, 1},
+                                        {{0, 3}, 0},
+                                        {{1, 2}, 0},
+                                        {{1, 3}, 1},
+                                        {{2, 4}, 1},
+                                        {{2, 5}, 1},
+                                        {{3, 4}, 1},
+                                        {{3, 5}, 1},
+                                        {{6, 2}, 0},
+                                        {{7, 3}, 0},
+                                        {{6, 7}, 1},
+                                    });
+  EXPECT_EQ(g.outer_red_potential(0, 1), 0);
+  EXPECT_EQ(g.outer_red_potential(6, 7), 4);
+  EXPECT_EQ(g.outer_red_potential(6, 0), 4);
+  EXPECT_EQ(g.outer_red_potential(6, 1), 0);
+}
+
+TEST(TriGraphTest, IsFreeContraction) {
+  TriGraph g1(util::range_to_vec(2), {});
+  TriGraph g2(util::range_to_vec(2), {{{0, 1}, 0}});
+  TriGraph g3(util::range_to_vec(2), {{{0, 1}, 1}});
+
+  EXPECT_TRUE(g1.is_free_contraction(0, 1));
+  EXPECT_TRUE(g2.is_free_contraction(0, 1));
+  EXPECT_TRUE(g3.is_free_contraction(0, 1));
 }

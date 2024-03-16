@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ds/graph/GraphLog.hpp"
+#include "ds/set/FastSet.hpp"
 #include "ds/set/SortedVectorSet.hpp"
 #include "util/hash_table.hpp"
 #include "util/logger.hpp"
@@ -59,8 +61,7 @@ class TriGraph {
   //============================================================================
   //    Pairwise Properties
   //============================================================================
-  std::vector<std::vector<int>> ncn_;  // number of common neighbors
-  std::vector<std::vector<int>> ncr_;  // number of common red neighbors
+  std::vector<std::vector<int>> mu_;  // the mu value: mu(i,j) := 2 * (# of common neighbors of i and j) - (# of common red neighbors of i and j)
 
  public:
   TriGraph() : TriGraph({}, {}) {}
@@ -73,8 +74,7 @@ class TriGraph {
         num_black_edges_(0),
         num_red_edges_(0),
         hash_(0ULL),
-        ncn_(n_orig_, std::vector<int>(n_orig_)),
-        ncr_(n_orig_, std::vector<int>(n_orig_)) {
+        mu_(n_orig_, std::vector<int>(n_orig_)) {
     // initialize hash table
     util::initialize_hash_table();
 
@@ -132,8 +132,7 @@ class TriGraph {
     num_black_edges_ = other.num_black_edges_;
     num_red_edges_ = other.num_red_edges_;
     hash_ = other.hash_;
-    ncn_ = other.ncn_;
-    ncr_ = other.ncr_;
+    mu_ = other.mu_;
   }
 
   /**
@@ -179,10 +178,12 @@ class TriGraph {
    */
   std::size_t number_of_red_edges() const { return num_red_edges_; }
 
- private:
   //============================================================================
   //    Hashing
   //============================================================================
+  uint64_t hash() const { return hash_; }
+
+ private:
   inline uint64_t vertex_hash(int i) const {
     auto mod = 1 << (util::HASH_TABLE_BITS - 1);
     return util::get_hash(mod + i % mod);
@@ -331,6 +332,16 @@ class TriGraph {
     hash_ ^= red_edge_hash(i, j);
   }
 
+  void remove_edge(Vertex i, Vertex j) {
+    assert(has_edge(i, j));
+
+    if (has_black_edge(i, j)) {
+      remove_black_edge(i, j);
+    } else {
+      remove_red_edge(i, j);
+    }
+  }
+
   void remove_black_edge(Vertex i, Vertex j) {
     assert(has_black_edge(i, j));
 
@@ -416,23 +427,28 @@ class TriGraph {
    */
   int weak_red_potential(Vertex i, Vertex j) const {
     assert(i != j);
-    auto ret = degree(i) + degree(j) - 2 * ncn_[i][j] + ncr_[i][j] - (has_edge(i, j) ? 2 : 0);
+    auto ret = degree(i) + degree(j) - mu_[i][j] - (has_edge(i, j) ? 2 : 0);
     assert(ret >= 0);
     return ret;
   }
 
   int outer_red_potential(Vertex i, Vertex j) const {
     int ret = -1;
-    for (auto v : adj_black_[i] ^ adj_black_[j]) ret = std::max(ret, red_degree(v));
-    return ret >= 0 ? ret + 1 : 0;
+    auto a1b1 = (adj_black_[i] ^ adj_black_[j]) - adj_red_[i] - adj_red_[j] - i - j;
+    for (auto v : a1b1) ret = std::max(ret, red_degree(v));
+    return ret + 1;
   }
 
   void compute_pairwise_properties() {
-    for (int i = 0; i < n_orig_; ++i) {
-      for (int j = i + 1; j < n_orig_; ++j) {
-        auto common_neighbors = (adj_black_[i] | adj_red_[i]) & (adj_black_[j] | adj_red_[j]);
-        ncn_[i][j] = ncn_[j][i] = common_neighbors.size();
-        ncr_[i][j] = ncr_[j][i] = (common_neighbors & (adj_red_[i] | adj_red_[j])).size();
+    // We may not change any entries for removed vertices.
+    int n = number_of_vertices();
+    auto vs = vertices();
+    for (int i = 0; i < n; ++i) {
+      auto u = vs[i];
+      for (int j = i + 1; j < n; ++j) {
+        auto v = vs[j];
+        auto common_neighbors = (adj_black_[u] | adj_red_[u]) & (adj_black_[v] | adj_red_[v]);
+        mu_[u][v] = mu_[v][u] = 2 * common_neighbors.size() - (common_neighbors & (adj_red_[u] | adj_red_[v])).size();
       }
     }
   }
@@ -448,7 +464,7 @@ class TriGraph {
    * @param i vertex to be merged
    * @return int maximum red degree in the closed neighborhood of j after contraction
    */
-  int contract(Vertex j, Vertex i, EdgeList* updated_vertex_pairs = nullptr) {
+  int contract(Vertex j, Vertex i, GraphLog* graph_log = nullptr) {
     assert(has_vertex(i));
     assert(has_vertex(j));
     assert(i != j);
@@ -477,110 +493,122 @@ class TriGraph {
     auto c3 = i_adj_r & j_adj_b;
     auto c4 = i_adj_r & j_adj_r;
 
-    auto a12 = a1 | a2;
-
     //--------------------------------------------------------------------------
-    // (1) Update the number of common neighbors
+    // I. Update mu values
     //--------------------------------------------------------------------------
-    for (auto a : a12) {
-      for (auto b : b1 | b2) {
-        ++ncn_[a][b];  // j becomes a new common neighbor of a and b
-        ++ncn_[b][a];
-        updated.push_back({std::min(a, b), std::max(a, b)});
-      }
-      for (auto v : adj_black_[a] | adj_red_[a]) {
-        if (v != i) {
-          ++ncn_[j][v];  // a becomes a new common neighbor of j and v
-          ++ncn_[v][j];
-          updated.push_back({std::min(j, v), std::max(j, v)});
-        }
-      }
-      if (edge_ij) {
-        --ncn_[j][a];  // i was a common neighbor
-        --ncn_[a][j];
-        updated.push_back({std::min(j, a), std::max(j, a)});
-      }
+    std::vector<std::pair<Edge, int>> mu_delta;
+
+    // clang-format off
+    // (1) A1 x (A1 | C1 | C2): -1
+    for (auto x : a1) for (auto y : a1) if (x < y) mu_delta.push_back({{x, y}, -1});
+    for (auto x : a1) for (auto y : c1 | c2) mu_delta.push_back({{x, y}, -1});
+
+    // (2) B1 x (C1 | C3 | B1): -1
+    for (auto x : b1) for (auto y : b1) if (x < y) mu_delta.push_back({{x, y}, -1});
+    for (auto x : b1) for (auto y : c1 | c3) mu_delta.push_back({{x, y}, -1});
+
+    // (3) C2 x C3: -1
+    for (auto x : c2) for (auto y : c3) mu_delta.push_back({{x, y}, -1});
+
+    // (4) C4 x (C1 | C2 | C3 | C4): -1
+    for (auto x : c4) for (auto y : c4) if (x < y) mu_delta.push_back({{x, y}, -1});
+    for (auto x : c4) for (auto y : c1 | c2 | c3) mu_delta.push_back({{x, y}, -1});
+
+    // (5) C2 x C2: -1
+    for (auto x : c2) for (auto y : c2) if (x < y) mu_delta.push_back({{x, y}, -2});
+
+    // (6) C1 x (C1 | C2 | C3): -2
+    for (auto x : c1) for (auto y : c1) if (x < y) mu_delta.push_back({{x, y}, -2});
+    for (auto x : c1) for (auto y : c2 | c3) mu_delta.push_back({{x, y}, -2});
+
+    // (7) C3 x C3: -2
+    for (auto x : c3) for (auto y : c3) if (x < y) mu_delta.push_back({{x, y}, -2});
+
+    // (8) (A1 | A2) x (B1 | B2): +1
+    for (auto x : a1 | a2) for (auto y : b1 | b2) mu_delta.push_back({{x, y}, 1});
+    // clang-format on
+
+    std::unordered_map<Vertex, int> mu_delta_j;
+    if (has_edge(i, j)) {
+      // (9) j x (A1 | C1 | C2): -1 or -2
+      for (auto x : a1 | c1 | c2) mu_delta_j[x] -= has_red_edge(i, j) ? 1 : 2;
+
+      // (10) j x (A2 | C3 | C4): -1
+      for (auto x : a2 | c3 | c4) mu_delta_j[x] -= 1;
     }
 
-    for (auto x : common_nbrs) {
-      for (auto y : common_nbrs) {
-        if (x == y) continue;
-        --ncn_[x][y];  // i was a common neighbor of x and y
-        updated.push_back({std::min(x, y), std::max(x, y)});
-      }
-    }
-
-    if (edge_ij) {
-      for (auto x : common_nbrs) {
-        --ncn_[j][x];  // i was a common neighbor of j and x
-        --ncn_[x][j];
-        updated.push_back({std::min(j, x), std::max(j, x)});
-      }
-    }
-
-    //--------------------------------------------------------------------------
-    // (2) Update the number of common red neighbors
-    //--------------------------------------------------------------------------
-    // (2a) red edges incident to i (including edge ij)
-    for (auto x : adj_red_[i]) {
-      for (auto y : adj_red_[i]) {
-        if (x == y) continue;
-        --ncr_[x][y];
-        updated.push_back({std::min(x, y), std::max(x, y)});
-      }
-      for (auto y : adj_black_[i]) {
-        --ncr_[x][y];
-        --ncr_[y][x];
-        updated.push_back({std::min(x, y), std::max(x, y)});
-      }
-    }
-
-    // (2b) for new red edge xj, j becomes a new common red neighbor of x and y for y <- N({i, j})
-    auto new_nbrs = a12 | c3 | b1;
-    for (auto x : new_nbrs) {
-      for (auto y : new_nbrs) {
-        if (x == y) continue;
-        ++ncr_[x][y];
-        updated.push_back({std::min(x, y), std::max(x, y)});
-      }
-    }
-
-    for (auto x : a12) {
-      for (auto y : c1 | c2 | c4 | b2) {
-        ++ncr_[x][y];
-        ++ncr_[y][x];
-        updated.push_back({std::min(x, y), std::max(x, y)});
-      }
-    }
-
-    for (auto x : c3 | b1) {
-      for (auto y : c1) {
-        ++ncr_[x][y];
-        ++ncr_[y][x];
-        updated.push_back({std::min(x, y), std::max(x, y)});
-      }
-    }
-
-    // (2c) for new red edge xj, x becomes a new common red neighbor of y and j for y <- N_B(x)
-    for (auto x : a12) {
+    // (11) j x N(A1 | A2): +1    new red edge between j and x <- (A1 | A2)
+    for (auto x : a1 | a2) {
       for (auto y : adj_black_[x] | adj_red_[x]) {
-        if (y == i) continue;
-        ++ncr_[y][j];
-        ++ncr_[j][y];
-        updated.push_back({std::min(y, j), std::max(y, j)});
+        if (y != i) mu_delta_j[y] += 1;
       }
     }
+
+    // (12) j x N_B(C3 | B1): -1    new red edge between j and x <- (C3 | B1)
     for (auto x : c3 | b1) {
       for (auto y : adj_black_[x]) {
-        if (y == j) continue;
-        ++ncr_[y][j];
-        ++ncr_[j][y];
-        updated.push_back({std::min(y, j), std::max(y, j)});
+        if (j != y) {
+          assert(y != i);
+          mu_delta_j[y] -= 1;
+        }
       }
     }
 
+    for (auto& p : mu_delta_j) {
+      if (p.second != 0) mu_delta.push_back({{j, p.first}, p.second});
+    }
+
     //--------------------------------------------------------------------------
-    // (3) Make changes
+    // II. Save graph log
+    //--------------------------------------------------------------------------
+    if (graph_log) {
+      // track changes in weak red potential
+      std::unordered_map<int, int> wrp_delta;
+      ds::set::FastSet common_nbrs_set(n_orig_);
+      for (auto x : common_nbrs) common_nbrs_set.set(x);
+
+      for (auto& p : mu_delta) wrp_delta[key(n_orig_, p.first.first, p.first.second)] = -p.second;
+
+      // apply changes in degrees
+      int j_deg_delta = a1.size() + a2.size() - edge_ij;
+      for (auto x : vertices_) {  // j x V
+        if (x != i && x != j) wrp_delta[key(n_orig_, j, x)] += j_deg_delta;
+      }
+
+      for (auto x : common_nbrs) {
+        for (auto y : vertices_) {
+          if (y == i) continue;
+          if (common_nbrs_set.get(y)) {  // C x C
+            if (x < y) wrp_delta[key(n_orig_, x, y)] -= 2;
+          } else {  // C x (V-C)  [including C x j]
+            wrp_delta[key(n_orig_, x, y)] -= 1;
+          }
+        }
+      }
+
+      // apply changes in new edges
+      for (auto x : a1 | a2) wrp_delta[key(n_orig_, j, x)] -= 2;
+
+      // collect the set of vertices whose weak red potential has decreased
+      std::vector<std::pair<int, int>> potential_decreased;
+      for (auto& p : wrp_delta) {
+        if (p.second < 0) potential_decreased.push_back({p.first / n_orig_, p.first % n_orig_});
+      }
+
+      // save values
+      graph_log->log_type = GraphLogType::CONTRACTION;
+      graph_log->merge = j;
+      graph_log->merged = i;
+      graph_log->removed_black = adj_black_[i].to_vector();
+      graph_log->removed_red = adj_red_[i].to_vector();
+      graph_log->new_neighbors = (a1 | a2).to_vector();
+      graph_log->recolored = (b1 | c3).to_vector();
+      graph_log->mu_delta = mu_delta;
+      graph_log->potential_decreased = potential_decreased;
+    }
+
+    //--------------------------------------------------------------------------
+    // III. Make changes
     //--------------------------------------------------------------------------
     // remove edge ij if exists
     if (edge_ij) {
@@ -598,31 +626,142 @@ class TriGraph {
     }
 
     // add red edges {j, w| w <- N(i) - N(j)}
-    for (int w : a12) {
-      //
-      add_red_edge(j, w);
-    }
+    for (int w : a1 | a2) add_red_edge(j, w);
 
     // remove vertex i
     remove_vertex(i);
 
-    //--------------------------------------------------------------------------
-    // (4) Return max red degree in the neighborhood
-    //--------------------------------------------------------------------------
-    if (updated_vertex_pairs) {
-      // create a unique list of updated vertex pairs
-      std::sort(updated.begin(), updated.end());
-      auto it = std::unique(updated.begin(), updated.end());
-      updated.resize(std::distance(updated.begin(), it));
-      *updated_vertex_pairs = updated;
+    // update mu values
+    for (auto& p : mu_delta) {
+      auto u = p.first.first;
+      auto v = p.first.second;
+      mu_[u][v] += p.second;
+      mu_[v][u] += p.second;
     }
 
+    //--------------------------------------------------------------------------
+    // IV. Return max red degree in the neighborhood
+    //--------------------------------------------------------------------------
     int ret = red_degree(j);
     for (auto w : adj_black_[j] | adj_red_[j]) ret = std::max(ret, red_degree(w));
     return ret;
   }
 
-  void undo_contract() {}
+  void undo(GraphLog const& graph_log) {
+    switch (graph_log.log_type) {
+      case GraphLogType::COMPLEMENT: {
+        black_complement();
+        break;
+      }
+      case GraphLogType::CONTRACTION: {
+        int i = graph_log.merged;
+        int j = graph_log.merge;
+
+        add_vertex(i);
+
+        // add edges
+        for (auto w : graph_log.removed_black) add_black_edge(i, w);
+        for (auto w : graph_log.removed_red) add_red_edge(i, w);
+
+        // remove edges
+        for (auto w : graph_log.new_neighbors) remove_edge(j, w);
+
+        // recolor edges
+        for (auto w : graph_log.recolored) {
+          remove_red_edge(j, w);
+          add_black_edge(j, w);
+        }
+
+        // revert mu values
+        for (auto& p : graph_log.mu_delta) {
+          auto u = p.first.first;
+          auto v = p.first.second;
+          mu_[u][v] -= p.second;
+          mu_[v][u] -= p.second;
+        }
+        break;
+      }
+      default: {
+        throw std::invalid_argument("never happens");
+      }
+    }
+  }
+
+  /**
+   * @brief Finds all vertex pairs whose weak red potential is at most the given threshold.
+   *
+   * @param upper_bound threshold value
+   * @param frozen_vertices vertices excluded from candidates
+   * @return std::vector<std::pair<Vertex, Vertex>> contraction candidates
+   */
+  std::vector<std::pair<Vertex, Vertex>> find_candidates(int upper_bound, VertexList const& frozen_vertices = {}) const {
+    static ds::set::FastSet frozen;
+    frozen.resize(n_orig_);
+    for (auto x : frozen_vertices) frozen.set(x);
+
+    VertexList vs;
+    for (auto x : vertices_) {
+      if (!frozen.get(x)) vs.push_back(x);
+    }
+
+    std::vector<std::pair<Vertex, Vertex>> ret;
+
+    int n = vs.size();
+    for (int i = 0; i < n; ++i) {
+      auto u = vs[i];
+      for (int j = i + 1; j < n; ++j) {
+        auto v = vs[j];
+        if (weak_red_potential(u, v) <= upper_bound) ret.push_back({u, v});
+      }
+    }
+    return ret;
+  }
+
+  /**
+   * @brief Updates contraction candidates after a contraction.
+   *
+   * @param previous_candidates previous candidates
+   * @param graph_log GraphLog instance of the previous contraction
+   * @param upper_bound threshould value
+   * @param frozen_vertices vertices excluded from candidates
+   * @return std::vector<std::pair<Vertex, Vertex>> contraction candidates
+   */
+  std::vector<std::pair<Vertex, Vertex>> update_candidates(               //
+      std::vector<std::pair<Vertex, Vertex>> const& previous_candidates,  //
+      GraphLog const& graph_log,                                          //
+      int upper_bound,                                                    //
+      VertexList const& frozen_vertices = {}                              //
+  ) const {
+    static ds::set::FastSet frozen;
+    static ds::set::FastSet seen;
+
+    frozen.resize(n_orig_);
+    seen.resize(n_orig_ * n_orig_);
+
+    for (auto x : frozen_vertices) frozen.set(x);
+
+    std::vector<std::pair<Vertex, Vertex>> ret;
+    for (auto& p : graph_log.potential_decreased) {
+      auto u = p.first;
+      auto v = p.second;
+      if (frozen.get(u) || frozen.get(v)) continue;
+      if (weak_red_potential(u, v) > upper_bound) continue;
+      ret.push_back({u, v});
+      seen.set(key(n_orig_, u, v));
+    }
+
+    for (auto& p : previous_candidates) {
+      auto u = p.first;
+      auto v = p.second;
+      assert(!frozen.get(u) && !frozen.get(v));
+      if (u == graph_log.merged || v == graph_log.merged) continue;
+      if (seen.get(key(n_orig_, u, v))) continue;
+      if (weak_red_potential(u, v) > upper_bound) continue;
+      ret.push_back({u, v});
+    }
+
+    return ret;
+  }
 
   //============================================================================
   //    Contraction sequence verification
@@ -645,37 +784,6 @@ class TriGraph {
       red_deg = std::max(red_deg, g.contract(j, i));
     }
     return red_deg;
-  }
-
-  //============================================================================
-  //    Debugging
-  //============================================================================
-  /**
-   * @brief Assert that the properties `ncn_` and `ncr_` are consistent
-   * with the current graph.
-   */
-  void check_consistency() const {
-    auto h = *this;
-    h.compute_pairwise_properties();
-
-    auto ncn = ncn_;
-    auto ncr = ncr_;
-    for (int i = 0; i < n_orig_; ++i) {
-      if (has_vertex(i)) continue;
-      for (auto j = 0; j < n_orig_; ++j) {
-        ncn[i][j] = ncn[j][i] = 0;
-        ncr[i][j] = ncr[j][i] = 0;
-      }
-    }
-    if (h.ncn_ != ncn) {
-      log_debug("Found inconsistency in ncn: expected=%s, actual=%s", cstr(h.ncn_), cstr(ncn_));
-      throw std::runtime_error("error in TriGraph#check_consistency()");
-    }
-
-    if (h.ncr_ != ncr) {
-      log_debug("Found inconsistency in ncr: expected=%s, actual=%s", cstr(h.ncr_), cstr(ncr_));
-      throw std::runtime_error("error in TriGraph#check_consistency()");
-    }
   }
 
   //============================================================================
@@ -741,6 +849,23 @@ class TriGraph {
   }
 
   //============================================================================
+  //    Debugging
+  //============================================================================
+  /**
+   * @brief Assert that the properties `ncn_` and `ncr_` are consistent
+   * with the current graph.
+   */
+  void check_consistency() const {
+    auto h = *this;
+    h.compute_pairwise_properties();
+
+    if (h.mu_ != mu_) {
+      log_debug("Found inconsistency in mu: expected=%s, actual=%s", cstr(h.mu_), cstr(mu_));
+      throw std::runtime_error("error in TriGraph#check_consistency()");
+    }
+  }
+
+  //============================================================================
   //    I/O
   //============================================================================
   /**
@@ -769,6 +894,8 @@ class TriGraph {
     assert(static_cast<int>(ret.size()) == (color == Black ? num_black_edges_ : num_red_edges_));
     return ret;
   }
+
+  inline int key(int n, int i, int j) const { return n * std::min(i, j) + std::max(i, j); }
 };
 }  // namespace graph
 }  // namespace ds

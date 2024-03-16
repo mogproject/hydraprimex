@@ -44,9 +44,8 @@ void FastSet::clear() {
  * O(size)
  */
 void FastSet::resize(std::size_t size) {
-  generation_ = 0;
-  data_.clear();
   data_.resize(size, -1);
+  clear();
 }
 
 /**

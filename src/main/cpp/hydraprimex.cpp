@@ -67,7 +67,8 @@ int main(int argc, char* argv[]) {
           log_success("Given upper bound is optimal (no output): tww=%d, elapsed=%.3fs", tww, root_timer.stop());
         } else {
           // something is wrong
-          log_critical("Possible bug: elapsed=%.3fs, cs=%s", root_timer.stop(), cstr(cs));
+          log_critical("Possible bug: elapsed=%.3fs, n=%lu, cs.size=%lu, cs=%s", root_timer.stop(),
+                       instance.graph.number_of_vertices(), cs.size(), cstr(cs));
           status_code = 3;
         }
       } else {
