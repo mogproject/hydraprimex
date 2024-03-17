@@ -272,3 +272,28 @@ TEST(TriGraphTest, IsFreeContraction) {
   EXPECT_TRUE(g2.is_free_contraction(0, 1));
   EXPECT_TRUE(g3.is_free_contraction(0, 1));
 }
+
+TEST(TriGraphTest, SubGraph) {
+  TriGraph g1({1, 3, 5, 7}, {
+                                {{1, 3}, 0},
+                                {{3, 5}, 1},
+                                {{3, 7}, 1},
+                                {{5, 7}, 0},
+                            });
+  EXPECT_EQ(g1.vertices(), VI({0, 1, 2, 3}));
+  EXPECT_EQ(g1.edges(true), TriGraph::ColoredEdgeList({{{0, 1}, 0}, {{1, 2}, 1}, {{1, 3}, 1}, {{2, 3}, 0}}));
+
+  auto s1 = g1.subgraph({1, 2, 3}, false);
+  s1.check_consistency();
+  EXPECT_EQ(s1.vertices(), VI({0, 1, 2, 3}));
+  EXPECT_EQ(s1.edges(true), TriGraph::ColoredEdgeList({{{1, 2}, 1}, {{1, 3}, 1}, {{2, 3}, 0}}));
+  EXPECT_EQ(s1.get_label(0), 1);
+  EXPECT_EQ(s1.get_label(1), 3);
+
+  auto s2 = g1.subgraph({1, 2, 3}, true);
+  s2.check_consistency();
+  EXPECT_EQ(s2.vertices(), VI({0, 1, 2}));
+  EXPECT_EQ(s2.edges(true), TriGraph::ColoredEdgeList({{{0, 1}, 1}, {{0, 2}, 1}, {{1, 2}, 0}}));
+  EXPECT_EQ(s2.get_label(0), 3);
+  EXPECT_EQ(s2.get_label(1), 5);
+}

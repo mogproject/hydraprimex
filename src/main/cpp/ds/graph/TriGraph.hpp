@@ -369,43 +369,22 @@ class TriGraph {
   bool is_free_contraction(Vertex i, Vertex j) const;
 
   //============================================================================
-  //    Complement
+  //    Graph operations
   //============================================================================
-
   /**
    * @brief Takes the black-edge complement; converts black edges to non-edges
    * and non-edges to black edges.
    */
-  void black_complement() {
-    int n = number_of_vertices();
-    if (n <= 1) return;
+  void black_complement();
 
-    auto vs = vertices_.to_vector();
-    auto vs_map = util::inverse_map(vs);
-
-    std::vector<std::vector<int>> mat(n, std::vector<int>(n));
-    for (auto e : black_edges()) {
-      assert(e.first < e.second);
-      mat[vs_map[e.first]][vs_map[e.second]] = 1;
-    }
-    for (auto e : red_edges()) {
-      assert(e.first < e.second);
-      mat[vs_map[e.first]][vs_map[e.second]] = 2;
-    }
-
-    for (int i = 0; i < n; ++i) {
-      for (int j = i + 1; j < n; ++j) {
-        if (mat[i][j] == 0) {
-          add_black_edge(vs[i], vs[j]);
-        } else if (mat[i][j] == 1) {
-          remove_black_edge(vs[i], vs[j]);
-        }
-      }
-    }
-
-    // need to recompute properties
-    compute_pairwise_properties();
-  }
+  /**
+   * @brief Create an induced subgraph on the given vertices.
+   *
+   * @param vs vertices to keep
+   * @param reindex compact indices if true
+   * @return TriGraph subgraph
+   */
+  TriGraph subgraph(std::vector<Vertex> vs, bool reindex = false);
 
   //============================================================================
   //    Debugging
