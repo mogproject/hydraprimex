@@ -39,13 +39,22 @@ void FastSet::clear() {
 }
 
 /**
+ * @brief Initializes the set with a new capcity.
+ *
+ * O(size)
+ */
+void FastSet::initialize(std::size_t size) {
+  resize(size);
+  clear();
+}
+
+/**
  * @brief Resizes the capacity of the set.
  *
  * O(size)
  */
 void FastSet::resize(std::size_t size) {
-  data_.resize(size, -1);
-  clear();
+  if (capacity() != size) data_.resize(size, -1);
 }
 
 /**
