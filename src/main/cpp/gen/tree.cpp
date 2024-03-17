@@ -1,6 +1,6 @@
-#include "generator/tree.hpp"
+#include "tree.hpp"
 
-namespace generator {
+namespace gen {
 /**
  * @brief Generates a path TriGraph of `n` vertices.
  *
@@ -47,4 +47,4 @@ ds::graph::TriGraph random_tree(util::Random& rand, int n) {
   return ds::graph::TriGraph(util::range_to_vec(n), edges);
 }
 
-}  // namespace generator
+}  // namespace gen

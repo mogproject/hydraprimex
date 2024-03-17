@@ -34,7 +34,7 @@ file(GLOB_RECURSE MAIN_SRC
   algorithm/*.[ch]pp
   app/*.[ch]pp
   ds/*.[ch]pp
-  generator/*.[ch]pp
+  gen/*.[ch]pp
   readwrite/*.[ch]pp
   sat/*.[ch]pp
   util/*.[ch]pp

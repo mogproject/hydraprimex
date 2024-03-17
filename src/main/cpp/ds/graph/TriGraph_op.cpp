@@ -1,4 +1,3 @@
-
 #include "TriGraph.hpp"
 
 namespace ds {

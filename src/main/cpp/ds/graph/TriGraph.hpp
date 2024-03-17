@@ -66,6 +66,8 @@ class TriGraph {
  public:
   TriGraph() : TriGraph({}, {}) {}
 
+  TriGraph(int n, EdgeList const& edges) : TriGraph(util::range_to_vec(n), TriGraph::to_colored_edges(edges)) {}
+
   TriGraph(VertexList const& vertices, ColoredEdgeList const& edges)
       : vertex_labels_(vertices),
         n_orig_(vertices.size()),
@@ -108,6 +110,10 @@ class TriGraph {
     compute_pairwise_properties();
   }
 
+ private:
+  static TriGraph::ColoredEdgeList to_colored_edges(TriGraph::EdgeList const& edges);
+
+ public:
   /**
    * equality
    */

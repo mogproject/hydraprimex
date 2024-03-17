@@ -3,7 +3,7 @@
 #include "ds/graph/TriGraph.hpp"
 #include "util/Random.hpp"
 
-namespace generator {
+namespace gen {
 /**
  * @brief Generates a path graph of `n` vertices.
  *
@@ -29,4 +29,4 @@ ds::graph::TriGraph full_rary_tree(int r, int n);
  * @return TriGraph instance
  */
 ds::graph::TriGraph random_tree(util::Random& rand, int n);
-}  // namespace generator
+}  // namespace gen

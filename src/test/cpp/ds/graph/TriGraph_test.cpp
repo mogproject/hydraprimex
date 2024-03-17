@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "ds/graph/TriGraph.hpp"
-#include "generator/random.hpp"
+#include "gen/random.hpp"
 
 using namespace std;
 using namespace ds::graph;
@@ -100,7 +100,7 @@ TEST(TriGraphTest, Contract) {
     for (auto n : vector<int>({5, 10, 30})) {
       for (int t = 0; t < 20; ++t) {
         // create a random graph
-        auto g = generator::erdos_renyi_graph(n, pr, rand);
+        auto g = gen::erdos_renyi_graph(n, pr, rand);
         // log_debug("n=%d, edges=%s", n, cstr(g.edges()));
 
         // create a random contraction sequence
@@ -124,7 +124,7 @@ TEST(TriGraphTest, UndoContraction) {
     for (auto n : vector<int>({5, 10, 30})) {
       for (int t = 0; t < 20; ++t) {
         // create a random graph
-        auto g = generator::erdos_renyi_graph(n, pr, rand);
+        auto g = gen::erdos_renyi_graph(n, pr, rand);
 
         // create a random contraction sequence
         auto seq = random_contraction_sequence(n, rand);
