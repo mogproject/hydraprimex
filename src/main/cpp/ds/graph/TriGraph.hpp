@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ds/graph/GraphLog.hpp"
+#include "ds/map/Bimap.hpp"
 #include "ds/set/FastSet.hpp"
 #include "ds/set/SortedVectorSet.hpp"
 #include "util/hash_table.hpp"
@@ -14,15 +15,16 @@ class TriGraph {
   //============================================================================
   //    Type Aliases
   //============================================================================
-  typedef int Vertex;                                // vertex label
-  typedef std::pair<Vertex, Vertex> Edge;            // edge
-  typedef int Color;                                 // edge color: 0=black, 1=red
-  typedef ds::set::SortedVectorSet AdjSet;           // adjacency set
-  typedef std::vector<Vertex> VertexList;            // vertex list
-  typedef std::pair<Edge, Color> ColoredEdge;        // edge with color
-  typedef std::vector<ColoredEdge> ColoredEdgeList;  // colored edge list
-  typedef std::vector<Edge> EdgeList;                // edge list
-  typedef EdgeList ContractSeq;                      // contraction sequence
+  typedef int Vertex;                                                    // vertex index
+  typedef int VertexLabel;                                               // vertex label
+  typedef std::pair<Vertex, Vertex> Edge;                                // edge
+  typedef int Color;                                                     // edge color: 0=black, 1=red
+  typedef ds::set::SortedVectorSet AdjSet;                               // adjacency set
+  typedef std::vector<Vertex> VertexList;                                // vertex list
+  typedef std::pair<Edge, Color> ColoredEdge;                            // edge with color
+  typedef std::vector<ColoredEdge> ColoredEdgeList;                      // colored edge list
+  typedef std::vector<Edge> EdgeList;                                    // edge list
+  typedef std::vector<std::pair<VertexLabel, VertexLabel>> ContractSeq;  // contraction sequence
 
   //============================================================================
   //    Constants
@@ -35,7 +37,7 @@ class TriGraph {
   //    Fields
   //============================================================================
   /** Labels for original vertices. */
-  VertexList vertex_labels_;
+  ds::map::Bimap<VertexLabel> vertex_labels_;
 
   /** Original number of vertices. */
   int n_orig_;
@@ -68,7 +70,10 @@ class TriGraph {
 
   TriGraph(int n, EdgeList const& edges) : TriGraph(util::range_to_vec(n), TriGraph::to_colored_edges(edges)) {}
 
-  TriGraph(VertexList const& vertices, ColoredEdgeList const& edges)
+  TriGraph(std::vector<VertexLabel> const& vertices, ColoredEdgeList const& edges)
+      : TriGraph(ds::map::Bimap<VertexLabel>(vertices), edges) {}
+
+  TriGraph(ds::map::Bimap<VertexLabel> const& vertices, ColoredEdgeList const& edges)
       : vertex_labels_(vertices),
         n_orig_(vertices.size()),
         adj_black_(n_orig_),
@@ -80,10 +85,6 @@ class TriGraph {
     // initialize hash table
     util::initialize_hash_table();
 
-    // compress vertex labels
-    std::unordered_map<int, int> label_inv;
-    for (int i = 0; i < n_orig_; ++i) label_inv[vertices[i]] = i;
-
     // initialize vertex hash
     for (int i = 0; i < n_orig_; ++i) hash_ ^= vertex_hash(i);
 
@@ -92,8 +93,8 @@ class TriGraph {
 
     // create colored edges
     for (auto& e : edges) {
-      auto i = label_inv[e.first.first];
-      auto j = label_inv[e.first.second];
+      auto i = vertex_labels_.g(e.first.first);
+      auto j = vertex_labels_.g(e.first.second);
       switch (e.second) {
         case Black: {
           add_black_edge(i, j);
@@ -231,9 +232,9 @@ class TriGraph {
    */
   EdgeList red_edges() const;
 
-  Vertex get_label(Vertex i) const;
+  VertexLabel get_label(Vertex i) const;
 
-  std::unordered_map<Vertex, Vertex> get_label_map() const;
+  Vertex get_index(VertexLabel x) const;
 
   //============================================================================
   //    Vertex and Edge Modifications

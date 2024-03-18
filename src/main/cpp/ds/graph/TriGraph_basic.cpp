@@ -65,14 +65,10 @@ TriGraph::EdgeList TriGraph::red_edges() const { return get_edges(Red); }
 
 TriGraph::Vertex TriGraph::get_label(Vertex i) const {
   assert(0 <= i && i < n_orig_);
-  return vertex_labels_[i];
+  return vertex_labels_.f(i);
 }
 
-std::unordered_map<TriGraph::Vertex, TriGraph::Vertex> TriGraph::get_label_map() const {
-  std::unordered_map<Vertex, Vertex> ret;
-  for (int i = 0; i < n_orig_; ++i) ret[vertex_labels_[i]] = i;
-  return ret;
-}
+TriGraph::Vertex TriGraph::get_index(TriGraph::VertexLabel x) const { return vertex_labels_.g(x); }
 
 //============================================================================
 //    Vertex and Edge Modifications

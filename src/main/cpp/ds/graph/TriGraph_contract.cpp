@@ -328,11 +328,10 @@ int TriGraph::verify_contraction_sequence(TriGraph const& graph, ContractSeq con
 
   auto g = graph;  // create a copy
   int red_deg = g.max_red_degree();
-  auto label_map = g.get_label_map();
 
   for (auto& p : seq) {
-    auto j = label_map[p.first];
-    auto i = label_map[p.second];
+    auto j = g.get_index(p.first);
+    auto i = g.get_index(p.second);
     if (!g.has_vertex(i) || !g.has_vertex(j)) throw std::runtime_error("vertex does not exist");
     red_deg = std::max(red_deg, g.contract(j, i));
   }
