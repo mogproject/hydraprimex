@@ -1,4 +1,5 @@
 #include "VertexSeparator.hpp"
+#include "ds/map/Bimap.hpp"
 #include "ds/set/FastSet.hpp"
 
 typedef ds::graph::TriGraph::Vertex Vertex;
@@ -105,12 +106,8 @@ std::vector<int> VertexSeparator::find_vertex_separator(  //
   std::vector<Vertex> xs, ys, zs, aa, bb;
 
   // vertex label remapping for randomness
-  auto forward = util::range_to_vec(n);  // id for x(), y(), z() |-> vertex label in `graph`
-  auto backward = forward;
-  if (rand) {
-    rand->shuffle(forward);
-    for (int i = 0; i < n; ++i) backward[forward[i]] = i;
-  }
+  ds::map::Bimap<int> labels(util::range_to_vec(n));
+  if (rand) labels.shuffle(*rand);
 
   //==========================================================================
   // Encode SAT instance
@@ -125,12 +122,12 @@ std::vector<int> VertexSeparator::find_vertex_separator(  //
   fs2.initialize(n);
 
   for (auto x : head) {
-    auto a = backward[x];
+    auto a = labels.g(x);
     fs1.set(a);
     aa.push_back(-z(a));
   }
   for (auto x : tail) {
-    auto b = backward[x];
+    auto b = labels.g(x);
     fs2.set(b);
     bb.push_back(-z(b));
   }
@@ -158,9 +155,9 @@ std::vector<int> VertexSeparator::find_vertex_separator(  //
 
   // reachability
   for (int i = 0; i < n; ++i) {
-    auto u = forward[i];
+    auto u = labels.f(i);
     for (auto v : graph.neighbors(u)) {
-      auto j = backward[v];
+      auto j = labels.g(v);
       // x(i) -> x(j) or z(j)
       solver_.add_clause({-x(i), x(j), z(j)});
       // y(i) -> y(j) or z(j)
@@ -179,7 +176,7 @@ std::vector<int> VertexSeparator::find_vertex_separator(  //
   }
 
   // non-separator
-  for (auto v : non_separator) solver_.add_clause({-z(backward[v])});
+  for (auto v : non_separator) solver_.add_clause({-z(labels.g(v))});
 
   // constraints on the solution size
   solver_.add_atmost(zs, max_separator_size);
@@ -194,7 +191,7 @@ std::vector<int> VertexSeparator::find_vertex_separator(  //
     std::vector<int> solution, result_a, result_b;
 
     for (int i = 0; i < n; ++i) {
-      auto v = forward[i];
+      auto v = labels.f(i);
       if (solver_.get_witness(z(i))) {
         solution.push_back(v);
         result_a.push_back(v);
