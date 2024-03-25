@@ -391,7 +391,22 @@ class TriGraph {
    * @param reindex compact indices if true
    * @return TriGraph subgraph
    */
-  TriGraph subgraph(std::vector<Vertex> vs, bool reindex = false);
+  TriGraph subgraph(std::vector<Vertex> vs, bool reindex = false) const;
+
+  /**
+   * @brief Finds all connected components in the graph, using both black and red edges.
+   *
+   * @return std::vector<std::vector<Vertex>> list of components
+   */
+  std::vector<std::vector<Vertex>> connected_components() const;
+
+  /**
+   * @brief Returns true if the graph is connected using both black and red edges.
+   *
+   * @return true graph is connected
+   * @return false graph is disconnected
+   */
+  bool is_connected() const;
 
   //============================================================================
   //    Debugging

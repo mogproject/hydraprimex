@@ -48,7 +48,7 @@ void TriGraph::black_complement() {
  * @param reindex compact indices if true
  * @return TriGraph subgraph
  */
-TriGraph TriGraph::subgraph(std::vector<TriGraph::Vertex> vs, bool reindex) {
+TriGraph TriGraph::subgraph(std::vector<TriGraph::Vertex> vs, bool reindex) const {
   static ds::set::FastSet fs;
   fs.initialize(number_of_original_vertices());
   for (auto v : vs) fs.set(v);

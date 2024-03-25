@@ -297,3 +297,27 @@ TEST(TriGraphTest, SubGraph) {
   EXPECT_EQ(s2.get_label(0), 3);
   EXPECT_EQ(s2.get_label(1), 5);
 }
+
+TEST(TriGraphTest, IsConnected) {
+  EXPECT_TRUE(TriGraph({}, {}).is_connected());
+  EXPECT_TRUE(TriGraph({1}, {}).is_connected());
+  EXPECT_TRUE(TriGraph({1, 2}, {{{1, 2}, 0}}).is_connected());
+  EXPECT_TRUE(TriGraph({1, 2}, {{{1, 2}, 1}}).is_connected());
+  EXPECT_FALSE(TriGraph({1, 2}, {}).is_connected());
+}
+
+TEST(TriGraphTest, ConnectedComponents) {
+  EXPECT_EQ(TriGraph({}, {}).connected_components(), VVI());
+  EXPECT_EQ(TriGraph({1}, {}).connected_components(), VVI({{0}}));
+  EXPECT_EQ(TriGraph({1, 2}, {{{1, 2}, 0}}).connected_components(), VVI({{0, 1}}));
+  EXPECT_EQ(TriGraph({1, 2}, {{{1, 2}, 1}}).connected_components(), VVI({{{0, 1}}}));
+  EXPECT_EQ(TriGraph({1, 2}, {}).connected_components(), VVI({{0}, {1}}));
+
+  TriGraph g1 = {{0, 1, 2, 3, 4},
+                 {
+                     {{0, 1}, 1},
+                     {{1, 4}, 0},
+                     {{3, 2}, 1},
+                 }};
+  EXPECT_EQ(g1.connected_components(), VVI({{0, 1, 4}, {2, 3}}));
+}
