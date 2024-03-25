@@ -285,7 +285,7 @@ TEST(TriGraphTest, SubGraph) {
 
   auto s1 = g1.subgraph({1, 2, 3}, false);
   s1.check_consistency();
-  EXPECT_EQ(s1.vertices(), VI({0, 1, 2, 3}));
+  EXPECT_EQ(s1.vertices(), VI({1, 2, 3}));
   EXPECT_EQ(s1.edges(true), TriGraph::ColoredEdgeList({{{1, 2}, 1}, {{1, 3}, 1}, {{2, 3}, 0}}));
   EXPECT_EQ(s1.get_label(0), 1);
   EXPECT_EQ(s1.get_label(1), 3);
@@ -296,6 +296,17 @@ TEST(TriGraphTest, SubGraph) {
   EXPECT_EQ(s2.edges(true), TriGraph::ColoredEdgeList({{{0, 1}, 1}, {{0, 2}, 1}, {{1, 2}, 0}}));
   EXPECT_EQ(s2.get_label(0), 3);
   EXPECT_EQ(s2.get_label(1), 5);
+
+  TriGraph g2({0, 1, 2, 3}, {
+                                {{0, 1}, 0},
+                                {{2, 3}, 1},
+                            });
+  auto s3 = g2.subgraph({0, 1}, false);
+  s3.check_consistency();
+  EXPECT_EQ(s3.number_of_vertices(), 2);
+  EXPECT_EQ(s3.number_of_edges(), 1);
+  EXPECT_EQ(s3.vertices(), VI({0, 1}));
+  EXPECT_EQ(s3.edges(true), TriGraph::ColoredEdgeList({{{0, 1}, 0}}));
 }
 
 TEST(TriGraphTest, IsConnected) {

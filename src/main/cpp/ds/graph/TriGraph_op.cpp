@@ -72,6 +72,11 @@ TriGraph TriGraph::subgraph(std::vector<TriGraph::Vertex> vs, bool reindex) cons
   } else {
     TriGraph ret(vertex_labels_, {});
 
+    // remove other vertices
+    for (int i = 0; i < number_of_original_vertices(); ++i) {
+      if (!fs.get(i)) ret.remove_vertex(i);
+    }
+
     // add edges
     for (int i : vertices_) {
       if (!fs.get(i)) continue;
