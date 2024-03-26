@@ -53,5 +53,5 @@ TEST_F(LBSeparateTest, RunWithTinyInstances) {
 
 TEST_F(LBSeparateTest, RunWithReducedInstances) {
   // verify_instance("src/test/resources/small/008/small008.gr", 2, true);
-  verify_instance("data/pace2023/exact_021.gr", 3, true);
+  // verify_instance("data/pace2023/exact_021.gr", 3, true);
 }

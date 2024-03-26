@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "algorithm/base/BaseSolver.hpp"
 #include "algorithm/exact/BranchSolver.hpp"
 #include "algorithm/exact/SATSolver.hpp"
@@ -10,37 +12,66 @@
 namespace algorithm {
 namespace lowerbound {
 
+//==============================================================================
+//    Signal Handling
+//==============================================================================
+namespace separate {
+
+extern bool volatile solver_ignore_alarm;
+extern bool volatile solver_terminate_flag;
+
+void solver_alarm_handler(int sig);
+void set_timeout(int time_limit_sec);
+void reset_timeout();
+}  // namespace separate
+
+//==============================================================================
+//    Main Class
+//==============================================================================
 class LBSeparate : public base::BaseSolver {
  private:
   typedef ds::graph::TriGraph::Vertex Vertex;
   int num_iterations_;
   int search_level_;
+  util::Timer const *root_timer_;
 
  public:
-  LBSeparate(int num_iterations = 20, int search_level = 0)
-      : num_iterations_(num_iterations), search_level_(search_level) {}
+  LBSeparate(int num_iterations = 20, int search_level = 0, util::Timer const *root_timer = nullptr)
+      : num_iterations_(num_iterations), search_level_(search_level), root_timer_(root_timer) {}
 
   void run(base::SolverState &state, int graph_id, util::Random &rand) override {
-    util::Timer timer;
+    util::Timer timer(0, root_timer_);
+    int time_limit = timer.get_effective_time_limit();
+    if (time_limit == 0) return;  // already timed out
+
     auto &g = state.get_graph(graph_id);
     log_info("%s LBSeparate started: n=%lu, num_iterations=%d, search_level=%d", state.label(graph_id).c_str(),
              g.number_of_vertices(), num_iterations_, search_level_);
+
+    // set alarm
+    if (time_limit > 0) separate::set_timeout(time_limit);
 
     auto h = g.subgraph(find_largest_component(g));
     assert(h.is_connected());
 
     int t = 0;
-    for (; t < num_iterations_ && !state.resolved(graph_id); ++t) {
+    for (; !separate::solver_terminate_flag && t < num_iterations_ && !state.resolved(graph_id); ++t) {
       int lb = run_iteration(h, rand, t, state.get_lower_bound());
 
       if (state.update_lower_bound(graph_id, lb)) {
         log_info("%s LBSeparate found new LB: t=%d, lb=%d", state.label(graph_id).c_str(), t, lb);
       }
     }
+
+    // cancel alarm
+    if (time_limit > 0) separate::reset_timeout();
+
     log_info("%s LBSeparate finished: t=%d, elapsed=%.2fs", state.label(graph_id).c_str(), t, timer.stop());
   }
 
   int run_iteration(ds::graph::TriGraph const &graph, util::Random &rand, int iteration_id, int known_lb) {
+    if (separate::solver_terminate_flag) return known_lb;
+
     auto g = graph;
     std::vector<Vertex> vertices = g.vertices();
     std::vector<Vertex> frozen_vertices;
@@ -203,6 +234,7 @@ class LBSeparate : public base::BaseSolver {
 
     // run solvers
     for (std::size_t i = 0; i < solvers.size() && !state.resolved(graph_id); ++i) {
+      if (separate::solver_terminate_flag) break;
       solvers[i]->run(state, graph_id, rand);
     }
     return;
