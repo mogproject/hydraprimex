@@ -188,9 +188,15 @@ class LBSeparate : public base::BaseSolver {
     solvers.push_back(std::make_unique<lowerbound::LBGreedy>(10));
 
     if (search_level_ == 0) {
-      solvers.push_back(std::make_unique<exact::BranchSolver>(1, 10000000L, 27));
+      solvers.push_back(std::make_unique<exact::BranchSolver>(1, 1000000L, 27));
+      // solvers.push_back(std::make_unique<exact::BranchSolver>(1, 1000000L, 27));
+      solvers.push_back(std::make_unique<exact::BranchSolver>(2, 1000000L, 30));
+      solvers.push_back(std::make_unique<exact::SATSolver>(nullptr, 1, 22));
     } else if (search_level_ == 1) {
-      solvers.push_back(std::make_unique<exact::BranchSolver>(3, 100000000L, 36));
+      solvers.push_back(std::make_unique<exact::BranchSolver>(3, 10000000L, 36));
+      // solvers.push_back(std::make_unique<exact::BranchSolver>(3, 10000000L, 36));
+      // solvers.push_back(std::make_unique<exact::BranchSolver>(6, 10000000L, 36));
+      solvers.push_back(std::make_unique<exact::SATSolver>(nullptr, 10, 27));
     } else {
       solvers.push_back(std::make_unique<exact::BranchSolver>(120, 1000000000L, 123));
     }
