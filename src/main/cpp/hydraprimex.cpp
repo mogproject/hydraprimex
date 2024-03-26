@@ -55,7 +55,9 @@ int main(int argc, char* argv[]) {
   algorithm::ExactSolver solver(&root_timer);
 
   int status_code = 0;
+#ifdef NDEBUG
   try {
+#endif
     solver.run(sstate, -1, rand);
 
     if (sstate.resolved()) {
@@ -103,6 +105,7 @@ int main(int argc, char* argv[]) {
       log_error("Could not find a solution: elapsed=%.3fs, path=%s", root_timer.stop(), conf.input_path.c_str());
       status_code = 2;
     }
+#ifdef NDEBUG
   } catch (std::invalid_argument const& e) {
     log_critical("Solver error: invalid_argument: %s, path=%s", e.what(), conf.input_path.c_str());
     status_code = 3;
@@ -110,6 +113,7 @@ int main(int argc, char* argv[]) {
     log_critical("Solver error: %s, path=%s", e.what(), conf.input_path.c_str());
     status_code = 3;
   }
+#endif
 
   return status_code;
 }

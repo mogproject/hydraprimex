@@ -37,6 +37,13 @@ class FastSet {
   void clear();
 
   /**
+   * @brief Initializes the set with a new capcity.
+   *
+   * O(size)
+   */
+  void initialize(std::size_t size);
+
+  /**
    * @brief Resizes the capacity of the set.
    *
    * O(size)

@@ -139,4 +139,3 @@ def normalize_contraction_sequence(seq: list[tuple[int, int]]) -> list[tuple[int
 
 def is_red_edge(G: nx.Graph, i: int, j: int) -> bool:
     return G.has_edge(i, j) and G.edges[i, j]['color'] == RED
-

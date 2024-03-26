@@ -22,7 +22,7 @@ class Reducer : public base::BaseSolver {
     ds::graph::TriGraph::ContractSeq seq;
 
     static ds::set::FastSet frozen;
-    frozen.resize(g.number_of_original_vertices());
+    frozen.initialize(g.number_of_original_vertices());
     for (auto x : frozen_vertices) frozen.set(x);
 
     bool updated = true;

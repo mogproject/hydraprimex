@@ -1,6 +1,6 @@
 #include "random.hpp"
 
-namespace generator {
+namespace gen {
 ds::graph::TriGraph erdos_renyi_graph(int n, double p, util::Random &rand) {
   ds::graph::TriGraph::VertexList vs = util::range_to_vec(n);
   ds::graph::TriGraph::ColoredEdgeList es;
@@ -12,4 +12,4 @@ ds::graph::TriGraph erdos_renyi_graph(int n, double p, util::Random &rand) {
   }
   return ds::graph::TriGraph(vs, es);
 }
-}  // namespace generator
+}  // namespace gen

@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "ds/graph/TriGraph.hpp"
-#include "generator/random.hpp"
+#include "gen/random.hpp"
 
 using namespace std;
 using namespace ds::graph;
@@ -100,7 +100,7 @@ TEST(TriGraphTest, Contract) {
     for (auto n : vector<int>({5, 10, 30})) {
       for (int t = 0; t < 20; ++t) {
         // create a random graph
-        auto g = generator::erdos_renyi_graph(n, pr, rand);
+        auto g = gen::erdos_renyi_graph(n, pr, rand);
         // log_debug("n=%d, edges=%s", n, cstr(g.edges()));
 
         // create a random contraction sequence
@@ -124,7 +124,7 @@ TEST(TriGraphTest, UndoContraction) {
     for (auto n : vector<int>({5, 10, 30})) {
       for (int t = 0; t < 20; ++t) {
         // create a random graph
-        auto g = generator::erdos_renyi_graph(n, pr, rand);
+        auto g = gen::erdos_renyi_graph(n, pr, rand);
 
         // create a random contraction sequence
         auto seq = random_contraction_sequence(n, rand);
@@ -271,4 +271,64 @@ TEST(TriGraphTest, IsFreeContraction) {
   EXPECT_TRUE(g1.is_free_contraction(0, 1));
   EXPECT_TRUE(g2.is_free_contraction(0, 1));
   EXPECT_TRUE(g3.is_free_contraction(0, 1));
+}
+
+TEST(TriGraphTest, SubGraph) {
+  TriGraph g1({1, 3, 5, 7}, {
+                                {{1, 3}, 0},
+                                {{3, 5}, 1},
+                                {{3, 7}, 1},
+                                {{5, 7}, 0},
+                            });
+  EXPECT_EQ(g1.vertices(), VI({0, 1, 2, 3}));
+  EXPECT_EQ(g1.edges(true), TriGraph::ColoredEdgeList({{{0, 1}, 0}, {{1, 2}, 1}, {{1, 3}, 1}, {{2, 3}, 0}}));
+
+  auto s1 = g1.subgraph({1, 2, 3}, false);
+  s1.check_consistency();
+  EXPECT_EQ(s1.vertices(), VI({1, 2, 3}));
+  EXPECT_EQ(s1.edges(true), TriGraph::ColoredEdgeList({{{1, 2}, 1}, {{1, 3}, 1}, {{2, 3}, 0}}));
+  EXPECT_EQ(s1.get_label(0), 1);
+  EXPECT_EQ(s1.get_label(1), 3);
+
+  auto s2 = g1.subgraph({1, 2, 3}, true);
+  s2.check_consistency();
+  EXPECT_EQ(s2.vertices(), VI({0, 1, 2}));
+  EXPECT_EQ(s2.edges(true), TriGraph::ColoredEdgeList({{{0, 1}, 1}, {{0, 2}, 1}, {{1, 2}, 0}}));
+  EXPECT_EQ(s2.get_label(0), 3);
+  EXPECT_EQ(s2.get_label(1), 5);
+
+  TriGraph g2({0, 1, 2, 3}, {
+                                {{0, 1}, 0},
+                                {{2, 3}, 1},
+                            });
+  auto s3 = g2.subgraph({0, 1}, false);
+  s3.check_consistency();
+  EXPECT_EQ(s3.number_of_vertices(), 2);
+  EXPECT_EQ(s3.number_of_edges(), 1);
+  EXPECT_EQ(s3.vertices(), VI({0, 1}));
+  EXPECT_EQ(s3.edges(true), TriGraph::ColoredEdgeList({{{0, 1}, 0}}));
+}
+
+TEST(TriGraphTest, IsConnected) {
+  EXPECT_TRUE(TriGraph({}, {}).is_connected());
+  EXPECT_TRUE(TriGraph({1}, {}).is_connected());
+  EXPECT_TRUE(TriGraph({1, 2}, {{{1, 2}, 0}}).is_connected());
+  EXPECT_TRUE(TriGraph({1, 2}, {{{1, 2}, 1}}).is_connected());
+  EXPECT_FALSE(TriGraph({1, 2}, {}).is_connected());
+}
+
+TEST(TriGraphTest, ConnectedComponents) {
+  EXPECT_EQ(TriGraph({}, {}).connected_components(), VVI());
+  EXPECT_EQ(TriGraph({1}, {}).connected_components(), VVI({{0}}));
+  EXPECT_EQ(TriGraph({1, 2}, {{{1, 2}, 0}}).connected_components(), VVI({{0, 1}}));
+  EXPECT_EQ(TriGraph({1, 2}, {{{1, 2}, 1}}).connected_components(), VVI({{{0, 1}}}));
+  EXPECT_EQ(TriGraph({1, 2}, {}).connected_components(), VVI({{0}, {1}}));
+
+  TriGraph g1 = {{0, 1, 2, 3, 4},
+                 {
+                     {{0, 1}, 1},
+                     {{1, 4}, 0},
+                     {{3, 2}, 1},
+                 }};
+  EXPECT_EQ(g1.connected_components(), VVI({{0, 1, 4}, {2, 3}}));
 }

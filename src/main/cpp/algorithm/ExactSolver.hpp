@@ -5,6 +5,7 @@
 #include "algorithm/exact/BranchSolver.hpp"
 #include "algorithm/exact/SATSolver.hpp"
 #include "algorithm/lowerbound/LBGreedy.hpp"
+#include "algorithm/lowerbound/LBSeparate.hpp"
 #include "algorithm/reduction/Reducer.hpp"
 #include "algorithm/upperbound/GreedySolver.hpp"
 #include "util/Timer.hpp"
@@ -28,10 +29,12 @@ class ExactSolver : public base::BaseSolver {
 
     solvers.push_back(std::make_unique<reduction::Reducer>());
     solvers.push_back(std::make_unique<lowerbound::LBGreedy>());
-    solvers.push_back(std::make_unique<exact::BranchSolver>(5, 100000L));                              // quick branch
-    solvers.push_back(std::make_unique<upperbound::GreedySolver>(1000, 2, root_timer_, 500, 0));       // quick greedy
-    solvers.push_back(std::make_unique<exact::SATSolver>(root_timer_, 10));                            // quick SAT
+    solvers.push_back(std::make_unique<exact::BranchSolver>(5, 1000000L));                        // quick branch
+    solvers.push_back(std::make_unique<upperbound::GreedySolver>(1000, 2, root_timer_, 500, 0));  // quick greedy
+    solvers.push_back(std::make_unique<lowerbound::LBSeparate>(10, 0, root_timer_));              // quick separate
+    // solvers.push_back(std::make_unique<exact::SATSolver>(root_timer_, 10));                            // quick SAT
     solvers.push_back(std::make_unique<upperbound::GreedySolver>(100000, 30, root_timer_, 10000, 0));  // greedy
+    solvers.push_back(std::make_unique<lowerbound::LBSeparate>(3, 1, root_timer_));                    // quick separate
     solvers.push_back(std::make_unique<exact::SATSolver>(root_timer_));
 
     //--------------------------------------------------------------------------

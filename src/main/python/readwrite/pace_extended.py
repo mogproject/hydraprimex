@@ -56,7 +56,7 @@ def load_pace_extended(path: str) -> tuple[nx.Graph, Optional[int], Optional[int
         return read_pace_extended(f)
 
 
-def write_pace_extended(output: TextIO, G: nx.Graph, comments: list[str] = [], ub: Optional[int] = None, lb: Optional[int] = None, offset: int=0) -> None:
+def write_pace_extended(output: TextIO, G: nx.Graph, comments: list[str] = [], ub: Optional[int] = None, lb: Optional[int] = None, offset: int = 0) -> None:
     problem = 'twwe'  # problem descriptor (TWin-Width Extended)
     n = G.number_of_nodes()
     m = G.number_of_edges()
