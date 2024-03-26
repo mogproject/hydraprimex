@@ -97,16 +97,15 @@ std::vector<int> VertexSeparator::find_vertex_separator(  //
     bool require_balance,                                 //
     std::vector<Vertex> const& non_separator              //
 ) const {
-  // printf("========\n");
-  // util::print(graph.edges());
-  // util::print(head);
-  // util::print(tail);
-  // printf("--\n");
+  log_trace("vertices: %s", cstr(graph.vertices()));
+  log_trace("edges: %s", cstr(graph.edges()));
+  log_trace("head=%s, tail=%s, non_separator=%s", cstr(head), cstr(tail), cstr(non_separator));
+
   int n = graph.number_of_vertices();
   std::vector<Vertex> xs, ys, zs, aa, bb;
 
   // vertex label remapping for randomness
-  ds::map::Bimap<int> labels(util::range_to_vec(n));
+  ds::map::Bimap<int> labels(graph.vertices());
   if (rand) labels.shuffle(*rand);
 
   //==========================================================================
@@ -204,12 +203,9 @@ std::vector<int> VertexSeparator::find_vertex_separator(  //
       }
     }
 
-    // printf("Solution: ");
-    // util::print(solution);
-    // printf("A: ");
-    // util::print(result_a);
-    // printf("B: ");
-    // util::print(result_b);
+    log_trace("solution: %s", cstr(solution));
+    log_trace("A: %s", cstr(result_a));
+    log_trace("B: %s", cstr(result_b));
 
     if (part_a) *part_a = result_a;
     if (part_b) *part_b = result_b;

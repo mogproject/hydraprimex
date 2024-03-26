@@ -38,6 +38,8 @@ class BranchSolver : public base::BaseSolver {
   long long counter_;
   long long counter_limit_;
 
+  int n_limit_;
+
   std::vector<Vertex> frozen_vertices_;
   ds::set::FastSet fs_frozen_;
 
@@ -53,12 +55,13 @@ class BranchSolver : public base::BaseSolver {
   util::Random hash_seen_rand_;
 
  public:
-  BranchSolver(int time_limit_sec = 0, long long counter_limit = 100000000L, util::Timer const* root_timer = nullptr,
-               std::vector<Vertex> frozen_vertices = {})
+  BranchSolver(int time_limit_sec = 0, long long counter_limit = 100000000L, int n_limit = -1,
+               util::Timer const* root_timer = nullptr, std::vector<Vertex> frozen_vertices = {})
       : time_limit_sec_(time_limit_sec),
         root_timer_(root_timer),
         counter_(0),
         counter_limit_(counter_limit),
+        n_limit_(n_limit),
         frozen_vertices_(frozen_vertices),
         hash_seen_rand_(0)  // Random instance used only for cache eviction
   {
@@ -68,12 +71,13 @@ class BranchSolver : public base::BaseSolver {
   void run(base::SolverState& state, int graph_id, util::Random& rand) override {
     if (state.resolved(graph_id)) return;  // already resolved
 
+    auto& g = state.get_graph(graph_id);
+    if (n_limit_ >= 0 && static_cast<int>(g.number_of_vertices()) > n_limit_) return;  // give up if n is too large
+
     util::Timer timer(time_limit_sec_, root_timer_);
     int time_limit = timer.get_effective_time_limit();
     if (time_limit == 0) return;  // already timed out
     time_limit = std::max(0, time_limit);
-
-    auto& g = state.get_graph(graph_id);
 
     log_info("%s BranchSolver started: n=%lu, time_limit=%s, counter_limit=%lld", state.label(graph_id).c_str(),
              g.number_of_vertices(), time_limit > 0 ? util::format("%ds", time_limit).c_str() : "N/A", counter_limit_);

@@ -81,6 +81,7 @@ test-cpp-cov: test-cpp
 	$(MKDIR) -p "$(COV_CPP_DIR)"
 	$(LCOV) -q --gcov-tool $(GCOV) -d "$(TEST_BIN_DIR)" -c -o "$(COV_CPP)"
 	$(LCOV) -q -r "${COV_CPP}" "*/include/*" "*.h" "*/test/*" "*/build*/*" "*/external/*" -o "${COV_CPP}"
+	$(LCOV) -a $(COV_CPP) -o $(COV_MERGED)
 
 test-py:
 # check style

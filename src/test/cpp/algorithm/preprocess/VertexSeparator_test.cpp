@@ -6,12 +6,21 @@
 using namespace algorithm::preprocess;
 using namespace ds::graph;
 
+class VertexSeparatorTest : public ::testing::Test {
+ protected:
+  virtual void SetUp() {
+    // Comment out here if you want to debug with TRACE logs.
+    util::set_log_level(util::logging::LogLevel::NONE);
+  }
+  virtual void TearDown() { util::set_log_level(util::logging::LogLevel::TRACE); }
+};
+
 typedef std::vector<int> VI;
 
 //
 // VertexSeparatorTest
 //
-TEST(VertexSeparatorTest, FindVertexSeparator) {
+TEST_F(VertexSeparatorTest, FindVertexSeparator) {
   VertexSeparator sep;
   auto g1 = TriGraph(7, {{0, 1}, {0, 2}, {0, 3}, {0, 4}, {0, 5}, {0, 6}});  // K_1,6
   EXPECT_EQ(sep.find_vertex_separator(g1, 1), VI({0}));
@@ -36,7 +45,16 @@ TEST(VertexSeparatorTest, FindVertexSeparator) {
   EXPECT_EQ(sep.find_vertex_separator(g5, 2), VI({2, 4}));
 }
 
-TEST(VertexSeparatorTest, DecomposeIntoCovers) {
+TEST_F(VertexSeparatorTest, FindVertexSeparatorNonConsecutive) {
+  VertexSeparator sep;
+  auto g1 = TriGraph(6, {{1, 3}, {3, 5}});
+  g1.remove_vertex(0);
+  g1.remove_vertex(2);
+  g1.remove_vertex(4);
+  EXPECT_EQ(sep.find_vertex_separator(g1, 1), VI({3}));
+}
+
+TEST_F(VertexSeparatorTest, DecomposeIntoCovers) {
   VertexSeparator sep;
 
   //----------------------------------------------------------------------------
@@ -117,7 +135,7 @@ TEST(VertexSeparatorTest, DecomposeIntoCovers) {
   for (int i = 0; i < 9; ++i) EXPECT_EQ(ret7[i].number_of_vertices(), 2);
 }
 
-TEST(VertexSeparatorTest, FindVertexSeparatorWithPrevSeparator) {
+TEST_F(VertexSeparatorTest, FindVertexSeparatorWithPrevSeparator) {
   VertexSeparator sep;
   auto g1 = TriGraph(
       8, {{0, 3}, {0, 5}, {0, 6}, {0, 7}, {1, 2}, {1, 5}, {1, 6}, {2, 3}, {2, 7}, {3, 4}, {4, 5}, {4, 6}, {4, 7}, {5, 6}});
@@ -153,7 +171,7 @@ std::vector<int> sorted(std::vector<int> xs) {
   return xs;
 }
 
-TEST(VertexSeparatorTest, FindArticulationPoints) {
+TEST_F(VertexSeparatorTest, FindArticulationPoints) {
   VertexSeparator sep;
   auto p5 = gen::path_graph(5);
   EXPECT_EQ(sorted(sep.find_articulation_points(p5)), VI({1, 2, 3}));
@@ -189,7 +207,7 @@ TEST(VertexSeparatorTest, FindArticulationPoints) {
   EXPECT_EQ(sorted(sep.find_articulation_points(g7)), VI({1, 4, 6}));
 }
 
-TEST(VertexSeparatorTest, FindVertexSeparatorWithNonSeparator) {
+TEST_F(VertexSeparatorTest, FindVertexSeparatorWithNonSeparator) {
   util::Random rand(12345);
   VertexSeparator sep;
   TriGraph g1(6, {{3, 0}, {0, 2}, {0, 4}, {2, 1}, {4, 1}, {1, 5}});

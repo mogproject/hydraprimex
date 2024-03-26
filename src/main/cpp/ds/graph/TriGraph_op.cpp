@@ -49,6 +49,8 @@ void TriGraph::black_complement() {
  * @return TriGraph subgraph
  */
 TriGraph TriGraph::subgraph(std::vector<TriGraph::Vertex> vs, bool reindex) const {
+  if (number_of_vertices() == vs.size()) return *this;
+
   static ds::set::FastSet fs;
   fs.initialize(number_of_original_vertices());
   for (auto v : vs) fs.set(v);
@@ -73,7 +75,7 @@ TriGraph TriGraph::subgraph(std::vector<TriGraph::Vertex> vs, bool reindex) cons
     TriGraph ret(vertex_labels_, {});
 
     // remove other vertices
-    for (int i = 0; i < number_of_original_vertices(); ++i) {
+    for (std::size_t i = 0; i < number_of_original_vertices(); ++i) {
       if (!fs.get(i)) ret.remove_vertex(i);
     }
 
